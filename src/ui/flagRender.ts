@@ -1,5 +1,8 @@
-// Desenho das bandeiras procedurais em pixel art (32x20 ampliado 2x).
+// Desenho das bandeiras em pixel art (32x20 ampliado 2x): bandeiras reais dos paises do mapa e bandeiras
+// procedurais das nacoes criadas durante a simulacao.
+import { hasRealFlag, REAL_FLAGS } from '../data/realFlags';
 import type { RGB } from '../data/terrain';
+import { FlagPainter } from '../render/sprites/FlagPainter';
 import { PixelArt, type RGBA } from '../render/sprites/PixelArt';
 import type { Country, FlagDesign } from '../state/types';
 
@@ -44,6 +47,11 @@ function emblem(a: PixelArt, kind: number, cx: number, cy: number, color: RGBA):
 
 export function drawFlag(design: FlagDesign): PixelArt {
   const a = new PixelArt(W);
+  const real = design.real ? REAL_FLAGS[design.real] : undefined;
+  if (real) {
+    real(new FlagPainter(a));
+    return a;
+  }
   const [c0, c1, c2] = design.colors.map(rgba);
   const fill = (x: number, y: number, w: number, h: number, c: RGBA) => a.rect(x, y, w, h, c);
   switch (design.pattern) {
@@ -81,10 +89,12 @@ function toUrl(art: PixelArt): string {
 }
 
 export function flagUrl(c: Country): string {
-  const key = JSON.stringify(c.flag);
+  // Saves anteriores nao marcavam a bandeira real: nacoes do mapa com codigo conhecido usam a bandeira verdadeira.
+  const design = !c.flag.real && c.kind === 'nation' && hasRealFlag(c.code) ? { ...c.flag, real: c.code } : c.flag;
+  const key = design.real ? `real:${design.real}` : JSON.stringify(design);
   let url = cache.get(key);
   if (!url) {
-    url = toUrl(drawFlag(c.flag));
+    url = toUrl(drawFlag(design));
     cache.set(key, url);
   }
   return url;

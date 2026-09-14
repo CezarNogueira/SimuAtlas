@@ -44,6 +44,7 @@ export interface FlagDesign {
   pattern: number;
   colors: RGB[];
   emblem: number;
+  real?: string; // codigo da bandeira real do pais (desenho fixo); o desenho procedural fica como reserva
 }
 
 export type CountryKind = 'nation' | 'rebel';

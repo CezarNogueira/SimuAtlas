@@ -1,6 +1,7 @@
 // Geracao procedural do desenho das bandeiras (apenas dados; o desenho em pixels fica no render).
 import type { Rng } from '../core/rng';
 import type { RGB } from '../data/terrain';
+import { hasRealFlag } from '../data/realFlags';
 import type { FlagDesign } from '../state/types';
 
 export const FLAG_PATTERNS = 12;
@@ -23,6 +24,13 @@ export function newFlag(rng: Rng, base: RGB): FlagDesign {
     colors: [main, others[0], others[1]],
     emblem: rng.chance(0.55) ? rng.int(1, FLAG_EMBLEMS - 1) : 0,
   };
+}
+
+// Bandeira de uma nacao do mapa: a bandeira real do pais, igual em qualquer mundo e semente. O desenho procedural
+// continua sorteado (mantem a sequencia do gerador) e so e usado por paises sem bandeira real conhecida.
+export function nationFlag(rng: Rng, base: RGB, code: string): FlagDesign {
+  const flag = newFlag(rng, base);
+  return hasRealFlag(code) ? { ...flag, real: code } : flag;
 }
 
 // Variacao de bandeira para faccoes rebeldes/revolucionarias.

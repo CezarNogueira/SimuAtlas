@@ -147,6 +147,10 @@ Parâmetros do mundo (novo jogo ou configurações):
   decididas pelas próprias nações).
 - **Eventos**: não são configuráveis; há 50% de chance de acontecer um evento no mundo a cada mês.
 
+**Bandeiras**: cada país real dos mapas tem a sua bandeira verdadeira desenhada em pixel art (32x20), sempre com o
+mesmo desenho e as mesmas cores, em qualquer mundo e semente (`src/data/realFlags.ts`). Nações que surgem durante a
+simulação (rebeldes, independências de regiões) recebem bandeiras procedurais.
+
 A guerra tem custos reais para quem luta:
 
 - **Dívida:** tropas em campanha custam de 2,3 a 3,5 vezes mais (soldos, armamentos, munição e provisões). O governo

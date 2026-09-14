@@ -13,7 +13,7 @@ import { RESOURCE_IDS, RESOURCES, type ResourceId } from '../data/resources';
 import type { RGB } from '../data/terrain';
 import type { MapData } from '../map/MapData';
 import { CONFLICT_LEVELS, DEFAULT_SETTINGS, type ConflictLevel, type Country, type GameState, type SimSettings } from '../state/types';
-import { newFlag } from './flags';
+import { nationFlag } from './flags';
 import { newLeader } from './names';
 import { Simulation } from './Simulation';
 import { emptyScience } from './technology/TechnologyResearchEngine';
@@ -162,7 +162,7 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
     const regnal: Record<string, number> = {};
     const c: Country = {
       id, code: n.code, name: n.name, article: articleFor(n.name), kind: 'nation', alive: true, color: colors[id],
-      flag: newFlag(rng, colors[id]), capital: n.capital, originalCapital: n.capital, government, ideology: 'traditionalism',
+      flag: nationFlag(rng, colors[id], n.code), capital: n.capital, originalCapital: n.capital, government, ideology: 'traditionalism',
       religion: meta.religion, culture: meta.culture, personality, ruler: newLeader(rng, meta.culture, 0, person(), regnal),
       regnalCount: regnal, generals: [], founded: 0, died: -1, continent: n.continent, lastElection: -rng.int(0, 5) * 365,
       treasury: 0, debt: 0, inflation: 0.02, unemployment: 0.06, taxRate: era.taxRate, gdp: 0, gdpLastYear: 0, growth: 0.01,
