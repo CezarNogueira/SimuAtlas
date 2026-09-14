@@ -1,0 +1,31 @@
+{
+  "name": "atlas-vivo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Atlas Vivo - simulador geopolitico de mapas em pixel art",
+  "type": "module",
+  "scripts": {
+    "fetch-data": "node tools/fetch-data.mjs",
+    "build-maps": "node tools/build-maps.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "sim": "tsx scripts/sim-headless.ts",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.10.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@fontsource/jacquarda-bastarda-9": "^5.3.0",
+    "@fontsource/pixelify-sans": "^5.3.0",
+    "@fontsource/tiny5": "^5.3.0"
+  }
+}

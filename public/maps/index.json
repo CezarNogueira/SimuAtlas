@@ -1,0 +1,62 @@
+[
+  {
+    "id": "world",
+    "name": "Mapa Mundial",
+    "description": "O planeta inteiro: todas as nações disputando continentes e oceanos.",
+    "width": 1800,
+    "height": 882,
+    "nations": 191,
+    "provinces": 1518,
+    "cities": 4978
+  },
+  {
+    "id": "americas",
+    "name": "Mapa das Américas",
+    "description": "Do Alasca à Terra do Fogo: impérios do Novo Mundo.",
+    "width": 1150,
+    "height": 1144,
+    "nations": 33,
+    "provinces": 368,
+    "cities": 1380
+  },
+  {
+    "id": "europe",
+    "name": "Mapa da Europa",
+    "description": "Reinos e repúblicas do Atlântico aos Urais.",
+    "width": 1400,
+    "height": 867,
+    "nations": 47,
+    "provinces": 697,
+    "cities": 1274
+  },
+  {
+    "id": "asia-oceania",
+    "name": "Mapa da Ásia + Oceania",
+    "description": "Impérios asiáticos, arquipélagos do Pacífico e a Oceania.",
+    "width": 1400,
+    "height": 1279,
+    "nations": 61,
+    "provinces": 717,
+    "cities": 1886
+  },
+  {
+    "id": "eurasia",
+    "name": "Mapa Europa + Ásia",
+    "description": "O supercontinente eurasiático, de Lisboa ao Pacífico.",
+    "width": 1700,
+    "height": 925,
+    "nations": 89,
+    "provinces": 967,
+    "cities": 2506
+  },
+  {
+    "id": "africa",
+    "name": "Mapa da África",
+    "description": "Do Mediterrâneo ao Cabo da Boa Esperança.",
+    "width": 1100,
+    "height": 999,
+    "nations": 56,
+    "provinces": 592,
+    "cities": 1233
+  }
+]
