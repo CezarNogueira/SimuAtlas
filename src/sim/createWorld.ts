@@ -12,7 +12,7 @@ import { PERSONALITIES, PERSONALITY_IDS, type PersonalityId } from '../data/pers
 import { RESOURCE_IDS, RESOURCES, type ResourceId } from '../data/resources';
 import type { RGB } from '../data/terrain';
 import type { MapData } from '../map/MapData';
-import { DEFAULT_SETTINGS, type Country, type GameState, type SimSettings } from '../state/types';
+import { CONFLICT_LEVELS, DEFAULT_SETTINGS, type ConflictLevel, type Country, type GameState, type SimSettings } from '../state/types';
 import { newFlag } from './flags';
 import { newLeader } from './names';
 import { Simulation } from './Simulation';
@@ -21,6 +21,18 @@ import { emptyScience } from './technology/TechnologyResearchEngine';
 // 2: mapas divididos em estados reais (saves da versao 1 usavam provincias geradas por cidades).
 // 3: eras historicas por ano e tecnologias com data, descobridor, propriedade, mercado e difusao.
 export const SAVE_VERSION = 3;
+
+// Parametros validos a partir de qualquer origem (novo jogo, script ou save antigo com multiplicadores percentuais).
+export function normalizeSettings(raw: object | undefined): SimSettings {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const level = r.aggression;
+  return {
+    aggression: typeof level === 'string' && level in CONFLICT_LEVELS ? (level as ConflictLevel) : DEFAULT_SETTINGS.aggression,
+    rebellions: typeof r.rebellions === 'boolean' ? r.rebellions : typeof r.rebellionFrequency === 'number' ? r.rebellionFrequency > 0 : DEFAULT_SETTINGS.rebellions,
+    diplomacy: typeof r.diplomacy === 'boolean' ? r.diplomacy : DEFAULT_SETTINGS.diplomacy,
+    autoPeace: r.autoPeace === true,
+  };
+}
 
 export interface NewGameOptions {
   eraId: string;
@@ -96,7 +108,7 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
     rng: rng.state,
     day: 0,
     startYear: era.year,
-    settings: { ...DEFAULT_SETTINGS, ...opts.settings },
+    settings: normalizeSettings({ ...DEFAULT_SETTINGS, ...opts.settings }),
     countries: [],
     provinces: [],
     armies: [],

@@ -35,7 +35,8 @@ export class RebellionEngine {
     const sim = this.sim;
     const s = sim.state;
     const rng = sim.rng;
-    const freq = s.settings.rebellionFrequency;
+    // Rebelioes desligadas: nenhuma revolta, guerra civil ou colapso espontaneo (rebeldes ja em armas seguem lutando).
+    const enabled = s.settings.rebellions;
     for (const c of [...s.countries]) {
       if (!c.alive) continue;
       if (c.kind === 'rebel') {
@@ -43,6 +44,8 @@ export class RebellionEngine {
         continue;
       }
       if (c.provinceCount === 0) continue;
+      if (c.overlord >= 0) this.checkVassal(c);
+      if (!enabled) continue;
       const factions = this.factionsAgainst(c.id).length;
       if (factions < 2) {
         let hot = -1;
@@ -54,16 +57,15 @@ export class RebellionEngine {
             hot = p;
           }
         }
-        if (hot >= 0 && hv > 55 && rng.chance(((hv - 55) / 300) * freq)) this.spawnRevolt(c, hot);
+        if (hot >= 0 && hv > 55 && rng.chance((hv - 55) / 300)) this.spawnRevolt(c, hot);
       }
-      if (factions === 0 && c.stability < 10 && c.provinceCount >= 5 && rng.chance(0.006 * freq)) {
+      if (factions === 0 && c.stability < 10 && c.provinceCount >= 5 && rng.chance(0.006)) {
         this.startCivilWar(c, 'a instabilidade crônica');
-      } else if (c.provinceCount >= 12 && c.stability < 10 && c.warExhaustion > 40 && rng.chance(0.02 * freq)) {
+      } else if (c.provinceCount >= 12 && c.stability < 10 && c.warExhaustion > 40 && rng.chance(0.02)) {
         const owned = sim.index.ownedBy[c.id];
         const nonCore = owned.filter((p) => !s.provinces[p].cores.includes(c.id)).length / owned.length;
         if (nonCore > 0.3) this.collapse(c);
       }
-      if (c.overlord >= 0) this.checkVassal(c);
     }
   }
 
@@ -140,10 +142,12 @@ export class RebellionEngine {
     }
   }
 
-  spawnRevolt(c: Country, pid: number, forced?: RebelType): Country | null {
+  // byPlayer: rebeliao incitada pelo jogador (acontece mesmo com as rebelioes espontaneas desligadas).
+  spawnRevolt(c: Country, pid: number, forced?: RebelType, byPlayer = false): Country | null {
     const sim = this.sim;
     const s = sim.state;
     const rng = sim.rng;
+    if (!byPlayer && !s.settings.rebellions) return null;
     const ps = s.provinces[pid];
     if (ps.owner !== c.id || c.kind !== 'nation') return null;
     const deadCore = ps.cores.find((k) => k !== c.id && !s.countries[k].alive && s.countries[k].kind === 'nation' && sim.day - s.countries[k].died > 5 * 365);
@@ -186,10 +190,11 @@ export class RebellionEngine {
     return rebel;
   }
 
-  startCivilWar(c: Country, reason: string): void {
+  startCivilWar(c: Country, reason: string, byPlayer = false): void {
     const sim = this.sim;
     const s = sim.state;
     const m = sim.map;
+    if (!byPlayer && !s.settings.rebellions) return;
     if (c.kind !== 'nation' || !c.alive || c.provinceCount < 3) return;
     if (sim.wars.warsOf(c.id).some((w) => w.goal.type === 'civil_war' || w.goal.type === 'revolution')) return;
     const owned = new Set(sim.index.ownedBy[c.id].filter((p) => s.provinces[p].controller === c.id));
@@ -434,14 +439,27 @@ export class RebellionEngine {
     const tribute = Math.max(0, v.income) * 0.1;
     v.treasury -= tribute;
     o.treasury += tribute;
+  }
+
+  // Motivacao de um vassalo para lutar pela independencia (0 = nenhuma). A guerra so comeca pelo sorteio mensal
+  // de conflitos entre nacoes, e apenas com as rebelioes ligadas.
+  liberationWeight(v: Country): number {
+    const sim = this.sim;
+    const o = v.overlord >= 0 ? sim.country(v.overlord) : null;
+    if (!o?.alive || !v.alive || !v.ai || v.kind !== 'nation' || sim.day - v.founded < 365 || !sim.state.settings.rebellions) return 0;
     const rel = sim.diplomacy.relation(v.id, o.id);
     const ratio = sim.countries.strength(v.id) / Math.max(1, sim.countries.strength(o.id));
-    const chance = (rel < -10 ? 0.02 : 0.004) + (sim.index.isAtWar(o.id) ? 0.02 : 0) + (ratio > 0.6 ? 0.02 : 0);
-    if (sim.day - v.founded < 365 || !sim.rng.chance(chance)) return;
+    return 5 + (rel < -10 ? 20 : 0) + (sim.index.isAtWar(o.id) ? 20 : 0) + (ratio > 0.6 ? 20 : 0);
+  }
+
+  liberate(v: Country): boolean {
+    const sim = this.sim;
+    const o = sim.country(v.overlord);
     const t = sim.state.treaties.find((x) => x.active && x.type === 'vassal' && x.members[0] === o.id && x.members[1] === v.id);
     if (t) sim.diplomacy.endTreaty(t);
     v.overlord = -1;
     sim.history.add('independence', `${v.name} rebelou-se contra seu suserano, ${o.name}.`, { countries: [v.id, o.id], importance: 2 });
     sim.wars.declareWar(v.id, o.id, { type: 'conquest', provinces: [], description: `Libertação do jugo ${sim.countries.de(o.id)}` });
+    return true;
   }
 }

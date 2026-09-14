@@ -7,9 +7,15 @@ import { GOVERNMENTS } from '../../data/governments';
 import { IDEOLOGIES } from '../../data/ideologies';
 import { EXPANSIONIST_PERSONALITIES, PERSONALITIES, type PersonalityInfo } from '../../data/personalities';
 import { RELIGIONS } from '../../data/religions';
-import type { Country, WarGoal } from '../../state/types';
+import { CONFLICT_LEVELS, type Country, type WarGoal } from '../../state/types';
 import type { Simulation } from '../Simulation';
 import { ATTACK_POWER } from './CountryEngine';
+
+// Conflito que pode comecar no sorteio mensal: peso (motivacao) e a declaracao da guerra.
+interface ConflictCandidate {
+  weight: number;
+  start: () => boolean;
+}
 
 export class AIEngine {
   constructor(private sim: Simulation) {}
@@ -27,8 +33,8 @@ export class AIEngine {
   private decide(c: Country): void {
     const sim = this.sim;
     sim.economy.invest(c);
-    if (!c.ai) return;
-    this.considerWar(c);
+    // Guerras surgem do sorteio mensal de conflitos (monthly); aqui so a diplomacia autonoma, se estiver ligada.
+    if (!c.ai || !sim.state.settings.diplomacy) return;
     this.considerDiplomacy(c);
     this.considerCoalition(c);
   }
@@ -37,7 +43,7 @@ export class AIEngine {
     const pers = PERSONALITIES[c.personality];
     const traitBonus = c.ruler.traits.includes('Ambicioso') ? 0.1 : c.ruler.traits.includes('Cauteloso') ? -0.08 : 0;
     const raw = pers.aggression + GOVERNMENTS[c.government].aggression + IDEOLOGIES[c.ideology].aggression + (c.ruler.skills.mil - 5) * 0.02 + traitBonus;
-    return clamp(raw, 0, 1.2) * this.sim.state.settings.aggression;
+    return clamp(raw, 0, 1.2);
   }
 
   private defensivePower(t: number): number {
@@ -50,22 +56,47 @@ export class AIEngine {
     return power;
   }
 
-  considerWar(c: Country): void {
+  // Conflitos entre nacoes: a cada mes ha uma chance fixa, definida pela agressividade escolhida, de surgir um
+  // conflito no mundo. Quando surge, o sorteio pondera os motivos de quem pode inicia-lo: conquista de uma nacao
+  // expansionista com poder na regiao, coalizao contra um expansionista ou luta de um vassalo pela independencia.
+  monthly(): void {
     const sim = this.sim;
-    const rng = sim.rng;
+    const chance = CONFLICT_LEVELS[sim.state.settings.aggression]?.chance ?? 0;
+    if (chance <= 0 || !sim.rng.chance(chance)) return;
+    const candidates: ConflictCandidate[] = [];
+    for (const c of sim.state.countries) {
+      if (!c.alive || c.kind !== 'nation' || !c.ai) continue;
+      const conquest = this.conquestCandidate(c);
+      if (conquest) candidates.push(conquest);
+      const liberation = c.overlord >= 0 ? sim.rebellion.liberationWeight(c) : 0;
+      if (liberation > 0) candidates.push({ weight: liberation, start: () => sim.rebellion.liberate(c) });
+    }
+    this.coalitionCandidates(candidates);
+    // Sorteio ponderado pela motivacao; se a declaracao nao for possivel, tenta o proximo candidato.
+    while (candidates.length) {
+      const total = candidates.reduce((acc, k) => acc + k.weight, 0);
+      let r = sim.rng.next() * total;
+      let i = 0;
+      while (i < candidates.length - 1 && (r -= candidates[i].weight) > 0) i++;
+      const [pick] = candidates.splice(i, 1);
+      if (pick.start()) return;
+    }
+  }
+
+  // Melhor guerra de conquista que a nacao iniciaria agora (null quando nao tem motivo nem meios).
+  private conquestCandidate(c: Country): ConflictCandidate | null {
+    const sim = this.sim;
     const pers = PERSONALITIES[c.personality];
     const wars = sim.wars.warsOf(c.id);
     // Guerras de conquista sao iniciativa exclusiva de personalidades expansionistas com poder real na sua regiao.
-    if (!EXPANSIONIST_PERSONALITIES.has(c.personality) || sim.countries.regionalPower(c.id) < ATTACK_POWER) return;
-    if (sim.day < 540) return;
-    if (wars.length >= 2 || c.warExhaustion > 35 || c.stability < 25 || c.overlord >= 0 || c.provinceCount === 0) return;
+    if (!EXPANSIONIST_PERSONALITIES.has(c.personality) || sim.countries.regionalPower(c.id) < ATTACK_POWER) return null;
+    if (wars.length >= 2 || c.warExhaustion > 35 || c.stability < 25 || c.overlord >= 0 || c.provinceCount === 0) return null;
     // Economia arrasada por guerras anteriores: sem dinheiro nem credito para outra.
     const debtRatio = c.debt / Math.max(1, c.gdp);
-    if (debtRatio > 1.1 || c.inflation > 0.3) return;
+    if (debtRatio > 1.1 || c.inflation > 0.3) return null;
     const aggression = this.aggressionOf(c);
     const lastWarEnd = c.pastWars.length ? sim.index.warById.get(c.pastWars[c.pastWars.length - 1])?.end ?? -1 : -1;
     const recentPeace = lastWarEnd >= 0 && sim.day - lastWarEnd < 4 * 365 ? 0.5 : 1;
-    if (!rng.chance((0.06 + aggression * 0.25) * recentPeace)) return;
     const owned = sim.index.ownedBy[c.id];
     const nonCore = owned.filter((p) => !sim.state.provinces[p].cores.includes(c.id)).length / Math.max(1, owned.length);
     const myPower = sim.countries.strength(c.id) + sim.diplomacy.partners(c.id, 'alliance').reduce((acc, a) => acc + sim.countries.strength(a) * 0.3, 0);
@@ -97,13 +128,16 @@ export class AIEngine {
       if (sim.diplomacy.priorWars(c.id, t) > 0 && T.provincesConquered > 0) score += 5;
       if (!best || score > best.score) best = { target: t, score, ratio };
     }
-    // Cada guerra em andamento torna uma nova frente menos atraente (guerras podem durar ate a dominacao).
-    const threshold = 45 + (wars.length ? 25 + 15 * (wars.length - 1) : 0);
-    if (!best || best.score < threshold) return;
+    // So guerras que interessam a nacao; cada guerra em andamento torna uma nova frente menos atraente.
+    const threshold = wars.length ? 25 + 15 * (wars.length - 1) : 0;
+    if (!best || best.score < threshold) return null;
+    const { target, ratio, score } = best;
     // Guerras so terminam com a dominacao: nao declarar contra quem os exercitos nao conseguem alcancar.
-    if (!landNeighbors.has(best.target) && !this.canReach(c, best.target)) return;
-    const goal = this.chooseGoal(c, best.target, best.ratio, pers);
-    sim.wars.declareWar(c.id, best.target, goal);
+    if (!landNeighbors.has(target) && !this.canReach(c, target)) return null;
+    return {
+      weight: (score - threshold + 10) * recentPeace * (0.5 + aggression),
+      start: () => !!sim.wars.declareWar(c.id, target, this.chooseGoal(c, target, ratio, pers)),
+    };
   }
 
   // Existe rota (terra ou mar, por territorio proprio, aliado ou do alvo) da capital ate a capital do alvo?
@@ -159,7 +193,7 @@ export class AIEngine {
     const rng = sim.rng;
     const dip = sim.diplomacy;
     const pers = PERSONALITIES[c.personality];
-    if (!rng.chance(0.35 * sim.state.settings.diplomacyFrequency)) return;
+    if (!rng.chance(0.35)) return;
     const neighbors = [...sim.countries.neighbors(c.id)].filter((n) => sim.country(n).alive && sim.country(n).kind === 'nation');
     if (!neighbors.length) return;
     const myStrength = sim.countries.strength(c.id);
@@ -247,27 +281,45 @@ export class AIEngine {
     }
   }
 
+  // Forma (ou amplia) uma coalizao contra um vizinho expansionista. A guerra da coalizao surge do sorteio mensal.
   considerCoalition(c: Country): void {
     const sim = this.sim;
-    const rng = sim.rng;
     const pers = PERSONALITIES[c.personality];
-    if (pers.coalitionJoin < 0.3 || !rng.chance(0.25)) return;
+    if (pers.coalitionJoin < 0.3 || !sim.rng.chance(0.25)) return;
     for (const t of sim.countries.neighbors(c.id)) {
       const T = sim.country(t);
       if (!T.alive || T.kind !== 'nation' || T.aggressiveExpansion < 40 || sim.diplomacy.relation(c.id, t) >= 10) continue;
       if (sim.countries.strength(t) < sim.countries.strength(c.id)) continue;
-      const coalition = sim.diplomacy.formCoalition(c.id, t);
-      if (!coalition) return;
-      const members = coalition.members.filter((m) => sim.country(m).alive);
-      const power = members.reduce((acc, m) => acc + sim.countries.strength(m), 0);
-      const alreadyContained = sim.wars.warsOf(t).some((w) => w.active && w.goal.type === 'coalition');
-      if (power > sim.countries.strength(t) * 1.3 && !alreadyContained && !members.some((m) => sim.index.atWar(m, t)) && rng.chance(0.2)) {
-        const leader = members.sort((a, b) => sim.countries.strength(b) - sim.countries.strength(a))[0];
-        const lost = sim.country(t).recentChanges.filter((ch) => ch.to === t && members.includes(ch.from)).map((ch) => ch.province);
-        const war = sim.wars.declareWar(leader, t, { type: 'coalition', provinces: [...new Set(lost)].slice(0, 8), description: `Conter o expansionismo ${sim.countries.de(t)}` });
-        if (war) for (const m of members) if (m !== leader) sim.wars.joinWar(war, m, 0);
-      }
+      sim.diplomacy.formCoalition(c.id, t);
       return;
+    }
+  }
+
+  // Coalizoes com forca para enfrentar o alvo que ainda nao estao em guerra contra ele.
+  private coalitionCandidates(out: ConflictCandidate[]): void {
+    const sim = this.sim;
+    for (const treaty of sim.state.treaties) {
+      if (!treaty.active || treaty.type !== 'coalition') continue;
+      const t = treaty.target ?? -1;
+      const T = t >= 0 ? sim.country(t) : null;
+      if (!T?.alive || T.kind !== 'nation') continue;
+      if (sim.wars.warsOf(t).some((w) => w.active && w.goal.type === 'coalition')) continue;
+      const members = treaty.members.filter((m) => sim.country(m).alive && sim.country(m).kind === 'nation');
+      if (!members.length || members.some((m) => sim.index.atWar(m, t))) continue;
+      const power = members.reduce((acc, m) => acc + sim.countries.strength(m), 0);
+      if (power <= sim.countries.strength(t) * 1.3) continue;
+      const leader = [...members].sort((a, b) => sim.countries.strength(b) - sim.countries.strength(a))[0];
+      if (!sim.country(leader).ai) continue;
+      out.push({
+        weight: 20 + T.aggressiveExpansion * 0.6,
+        start: () => {
+          const lost = T.recentChanges.filter((ch) => ch.to === t && members.includes(ch.from)).map((ch) => ch.province);
+          const war = sim.wars.declareWar(leader, t, { type: 'coalition', provinces: [...new Set(lost)].slice(0, 8), description: `Conter o expansionismo ${sim.countries.de(t)}` });
+          if (!war) return false;
+          for (const m of members) if (m !== leader) sim.wars.joinWar(war, m, 0);
+          return true;
+        },
+      });
     }
   }
 }

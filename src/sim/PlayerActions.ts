@@ -124,13 +124,13 @@ export class PlayerActions {
     }
     if (target < 0) return fail('Nenhum estado disponível.');
     sim.state.provinces[target].unrest = Math.max(sim.state.provinces[target].unrest, 70);
-    return sim.rebellion.spawnRevolt(c, target) ? ok('Rebelião incitada.') : fail('O estado não pode se rebelar agora.');
+    return sim.rebellion.spawnRevolt(c, target, undefined, true) ? ok('Rebelião incitada.') : fail('O estado não pode se rebelar agora.');
   }
 
   civilWar(countryId: number): ActionResult {
     const c = this.sim.country(countryId);
     const before = this.sim.index.activeWars.length;
-    this.sim.rebellion.startCivilWar(c, 'a intervenção de forças ocultas');
+    this.sim.rebellion.startCivilWar(c, 'a intervenção de forças ocultas', true);
     return this.sim.index.activeWars.length > before ? ok('Guerra civil deflagrada.') : fail('O país é pequeno ou já está em guerra civil.');
   }
 

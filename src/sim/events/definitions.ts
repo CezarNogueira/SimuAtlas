@@ -23,7 +23,7 @@ export interface EventDefinition {
   id: string;
   name: string;
   category: EventCategory;
-  chance: number; // probabilidade mensal base
+  chance: number; // frequencia relativa base no sorteio do evento do mes
   weight?: (ctx: EventContext) => number;
   apply: (ctx: EventContext) => void;
 }
@@ -125,7 +125,7 @@ export const EVENTS: EventDefinition[] = [
   },
   {
     id: 'popular_revolt', name: 'Revolta popular', category: 'social', chance: 0.003,
-    weight: (ctx) => Math.pow(avgUnrest(ctx) / 30, 2) * (1 - ctx.c.stability / 100),
+    weight: (ctx) => (ctx.sim.state.settings.rebellions ? Math.pow(avgUnrest(ctx) / 30, 2) * (1 - ctx.c.stability / 100) : 0),
     apply: (ctx) => {
       const p = hottest(ctx, (q) => ctx.sim.state.provinces[q].controller === ctx.c.id);
       if (p < 0) return;
@@ -135,7 +135,7 @@ export const EVENTS: EventDefinition[] = [
   },
   {
     id: 'separatist_revolt', name: 'Revolta separatista', category: 'política', chance: 0.002,
-    weight: (ctx) => nonCoreShare(ctx) * 3 + (avgUnrest(ctx) > 40 ? 0.5 : 0),
+    weight: (ctx) => (ctx.sim.state.settings.rebellions ? nonCoreShare(ctx) * 3 + (avgUnrest(ctx) > 40 ? 0.5 : 0) : 0),
     apply: (ctx) => {
       const p = hottest(ctx, (q) => !ctx.sim.state.provinces[q].cores.includes(ctx.c.id) && ctx.sim.state.provinces[q].controller === ctx.c.id);
       if (p < 0) return;
@@ -156,7 +156,7 @@ export const EVENTS: EventDefinition[] = [
   },
   {
     id: 'revolution', name: 'Revolução', category: 'política', chance: 0.0008,
-    weight: ({ c }) => (c.stability < 30 && c.happiness < 40 ? 2 : 0) * (c.government === 'monarchy' || c.government === 'empire' ? 1.5 : 1),
+    weight: ({ sim, c }) => (sim.state.settings.rebellions && c.stability < 30 && c.happiness < 40 ? 2 : 0) * (c.government === 'monarchy' || c.government === 'empire' ? 1.5 : 1),
     apply: (ctx) => {
       const p = ctx.c.capital >= 0 && ctx.sim.state.provinces[ctx.c.capital].owner === ctx.c.id ? ctx.c.capital : hottest(ctx);
       if (p < 0) return;
@@ -166,7 +166,7 @@ export const EVENTS: EventDefinition[] = [
   },
   {
     id: 'civil_war', name: 'Guerra civil', category: 'política', chance: 0.0006,
-    weight: ({ c }) => (c.stability < 20 && c.provinceCount >= 4 ? 1.5 : 0),
+    weight: ({ sim, c }) => (sim.state.settings.rebellions && c.stability < 20 && c.provinceCount >= 4 ? 1.5 : 0),
     apply: (ctx) => ctx.sim.rebellion.startCivilWar(ctx.c, 'a disputa política interna'),
   },
   {

@@ -217,7 +217,7 @@ export class NationPanel extends BasePanel {
       kv('fire', 'Inflação', fmtPct(c.inflation)),
       kv('people', 'Desemprego', fmtPct(c.unemployment)),
       kv('coins', 'Impostos', fmtPct(c.taxRate)),
-      kv('scroll', 'Acordos comerciais', trades.length ? trades.map((t) => cLink(sim, t)).join(', ') : '0'),
+      kv('scroll', 'Acordos comerciais', trades.length ? trades.map((t) => cLink(sim, t)).join('<br>') : '0'),
       kv('skull', 'Sanções sofridas', String(sanctions)),
     ]);
     const mods = c.modifiers.filter((m) => m.economy || m.growth);

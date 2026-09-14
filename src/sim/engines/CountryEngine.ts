@@ -33,9 +33,10 @@ export interface CreateCountryOptions {
 
 import { EXPANSIONIST_PERSONALITIES } from '../../data/personalities';
 
-// Poder regional minimo para conquistar territorio e para iniciar uma guerra de conquista.
+// Poder regional minimo para conquistar territorio e para iniciar uma guerra de conquista (abaixo dele o pais e
+// fraco); a guerra ainda exige 50% a mais de forca que o alvo e seus defensores.
 export const WEAK_POWER = 0.15;
-export const ATTACK_POWER = 0.3;
+export const ATTACK_POWER = WEAK_POWER;
 // Abaixo deste poder absoluto (fracao da maior potencia do mapa), o pais e fraco mesmo cercado de paises minusculos.
 const MIN_ABSOLUTE_POWER = 0.02;
 

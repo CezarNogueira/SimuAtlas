@@ -148,6 +148,7 @@ export class Simulation {
       this.military.monthly();
       this.diplomacy.monthly();
       this.wars.monthly();
+      this.ai.monthly();
       this.rebellion.monthly();
       this.events.monthly();
       this.technology.monthly();

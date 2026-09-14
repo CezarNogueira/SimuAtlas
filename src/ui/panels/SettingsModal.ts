@@ -1,6 +1,6 @@
 // Configuracoes: exibicao do mapa, parametros da simulacao e preferencias da interface.
 import type { RenderSettings } from '../../render/MapRenderer';
-import type { SimSettings } from '../../state/types';
+import { CONFLICT_LEVEL_IDS, CONFLICT_LEVELS, type ConflictLevel } from '../../state/types';
 import { esc, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
 import { sec } from './common';
@@ -16,15 +16,6 @@ const RENDER_TOGGLES: [keyof RenderSettings, string][] = [
   ['showSeaRoutes', 'Rotas marítimas'],
   ['showArrows', 'Setas de ofensiva'],
   ['showBattles', 'Marcadores de batalha'],
-];
-
-type NumericSimKey = Exclude<keyof SimSettings, 'autoPeace'>;
-
-const SIM_SLIDERS: [NumericSimKey, string, number, number][] = [
-  ['aggression', 'Agressividade das nações', 25, 200],
-  ['eventFrequency', 'Frequência de eventos', 0, 250],
-  ['rebellionFrequency', 'Frequência de rebeliões', 0, 250],
-  ['diplomacyFrequency', 'Atividade diplomática', 25, 250],
 ];
 
 export class SettingsModal extends BasePanel {
@@ -51,8 +42,15 @@ export class SettingsModal extends BasePanel {
         <option value="all"${r.showArmies === 'all' ? ' selected' : ''}>Todos</option>
         <option value="none"${r.showArmies === 'none' ? ' selected' : ''}>Nenhum (só a nação selecionada)</option>
       </select></label>`;
-    const sliders = SIM_SLIDERS.map(([key, label, min, max]) => `<label class="col">${esc(label)}: <b data-out="${key}">${Math.round(s[key] * 100)}%</b>
-      <input class="px-range" type="range" min="${min}" max="${max}" step="5" value="${Math.round(s[key] * 100)}" data-change="sim" data-key="${key}"></label>`).join('');
+    const simOpts = `
+      <label class="col">Agressividade das nações
+        <select class="px-select" data-change="aggression">
+          ${CONFLICT_LEVEL_IDS.map((id) => `<option value="${id}"${s.aggression === id ? ' selected' : ''}>${esc(CONFLICT_LEVELS[id].name)}</option>`).join('')}
+        </select>
+        <span class="muted" data-out="aggression">${esc(CONFLICT_LEVELS[s.aggression].description)}</span></label>
+      <label><input class="px-check" type="checkbox" data-change="rebellions"${s.rebellions ? ' checked' : ''}> Rebeliões</label>
+      <label><input class="px-check" type="checkbox" data-change="diplomacy"${s.diplomacy ? ' checked' : ''}> Atividade diplomática</label>
+      <div class="muted">Eventos: 50% de chance de acontecer um evento no mundo a cada mês.</div>`;
     const ui = `
       <label class="col">Notificações na tela
         <select class="px-select" data-change="toasts">
@@ -67,7 +65,7 @@ export class SettingsModal extends BasePanel {
       <label><input class="px-check" type="checkbox" data-change="pausewar"${p.pauseOnSelectedWar ? ' checked' : ''}> Pausar quando a nação selecionada entrar em guerra</label>`;
     return (
       sec('Mapa', 'globe', `<div class="settings-grid">${toggles}${armies}</div>`) +
-      sec('Simulação', 'gear', `<div class="settings-grid">${sliders}</div>
+      sec('Simulação', 'gear', `<div class="settings-grid">${simOpts}</div>
         <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="px-check" type="checkbox" data-change="autopeace"${s.autoPeace ? ' checked' : ''}> Nações fazem as pazes sozinhas (tratados automáticos)</label>
         <div class="muted">Desligado: cada guerra continua até um lado dominar o outro ou até você decidir a paz no painel da guerra. As mudanças valem imediatamente para este mundo.</div>`) +
       sec('Interface', 'info', `<div class="settings-grid">${ui}</div>`) +
@@ -90,13 +88,20 @@ export class SettingsModal extends BasePanel {
         ui.renderer.settings.showArmies = input.value as RenderSettings['showArmies'];
         ui.saveRenderSettings();
         break;
-      case 'sim': {
-        const key = t.dataset.key as NumericSimKey;
-        this.sim.state.settings[key] = Number(input.value) / 100;
-        const out = this.box.querySelector(`[data-out="${key}"]`);
-        if (out) out.textContent = `${input.value}%`;
+      case 'aggression': {
+        const level = input.value as ConflictLevel;
+        if (!CONFLICT_LEVELS[level]) break;
+        this.sim.state.settings.aggression = level;
+        const out = this.box.querySelector('[data-out="aggression"]');
+        if (out) out.textContent = CONFLICT_LEVELS[level].description;
         break;
       }
+      case 'rebellions':
+        this.sim.state.settings.rebellions = input.checked;
+        break;
+      case 'diplomacy':
+        this.sim.state.settings.diplomacy = input.checked;
+        break;
       case 'autopeace':
         this.sim.state.settings.autoPeace = input.checked;
         break;

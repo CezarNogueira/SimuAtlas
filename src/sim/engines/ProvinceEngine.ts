@@ -122,7 +122,6 @@ export class ProvinceEngine {
   monthly(): void {
     const sim = this.sim;
     const s = sim.state;
-    const freq = s.settings.rebellionFrequency;
     for (let id = 0; id < s.provinces.length; id++) {
       const p = s.provinces[id];
       if (p.owner < 0) continue;
@@ -136,7 +135,7 @@ export class ProvinceEngine {
       if (p.controller !== p.owner) target += 8;
       if (p.epidemic > 0) target += 10;
       target -= p.development / 6;
-      target = clamp(target * gov.rebellion * freq, 0, 100);
+      target = clamp(target * gov.rebellion, 0, 100);
       p.unrest += (target - p.unrest) * 0.1;
       if (p.controller !== p.owner) p.devastation = Math.min(1, p.devastation + 0.006);
       // Recuperacao natural lenta (mais lenta ainda num pais instavel ou falido); o investimento acelera.

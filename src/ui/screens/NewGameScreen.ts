@@ -2,6 +2,7 @@
 import type { App } from '../../app/App';
 import { fmtInt } from '../../core/format';
 import { ERAS, eraOfYear } from '../../data/eras';
+import { CONFLICT_LEVEL_IDS, CONFLICT_LEVELS, DEFAULT_SETTINGS, type ConflictLevel } from '../../state/types';
 import { el, esc, icon } from '../dom';
 
 const MAP_ORDER = ['world', 'americas', 'europe', 'asia-oceania', 'eurasia', 'africa'];
@@ -44,17 +45,22 @@ export class NewGameScreen {
               <span style="display:flex;gap:6px"><input class="px-input" data-seed type="number" value="${Math.floor(Math.random() * 1e6)}" style="flex:1"><button class="px-btn small" data-act="dice">Sortear</button></span>
               <span class="hint">A mesma semente gera a mesma história inicial.</span>
             </label>
-            <label>Agressividade das nações: <b data-out="aggression">100%</b>
-              <input class="px-range" type="range" min="25" max="200" step="5" value="100" data-opt="aggression">
+            <label>Agressividade das nações
+              <select class="px-select" data-aggression>
+                ${CONFLICT_LEVEL_IDS.map((id) => `<option value="${id}"${id === DEFAULT_SETTINGS.aggression ? ' selected' : ''}>${esc(CONFLICT_LEVELS[id].name)}</option>`).join('')}
+              </select>
+              <span class="hint" data-out="aggression">${esc(CONFLICT_LEVELS[DEFAULT_SETTINGS.aggression].description)}</span>
             </label>
-            <label>Frequência de eventos: <b data-out="events">100%</b>
-              <input class="px-range" type="range" min="0" max="250" step="10" value="100" data-opt="events">
+            <label>Rebeliões
+              <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-rebellions checked> Ligadas</span>
+              <span class="hint">Revoltas, revoluções, guerras civis e lutas de vassalos pela independência.</span>
             </label>
-            <label>Frequência de rebeliões: <b data-out="rebellions">100%</b>
-              <input class="px-range" type="range" min="0" max="250" step="10" value="100" data-opt="rebellions">
+            <label>Atividade diplomática
+              <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-diplomacy checked> Ligada</span>
+              <span class="hint">As nações formam alianças, pactos, comércio, garantias, sanções e coalizões por conta própria.</span>
             </label>
-            <label>Atividade diplomática: <b data-out="diplomacy">100%</b>
-              <input class="px-range" type="range" min="25" max="250" step="5" value="100" data-opt="diplomacy">
+            <label>Eventos
+              <span class="hint">50% de chance de acontecer um evento no mundo a cada mês.</span>
             </label>
             <label>Fim das guerras
               <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-autopeace> Nações fazem as pazes sozinhas</span>
@@ -69,12 +75,11 @@ export class NewGameScreen {
       </div>`;
     root.appendChild(this.node);
     this.node.addEventListener('click', (ev) => this.onClick(ev));
-    this.node.addEventListener('input', (ev) => {
-      const input = ev.target as HTMLInputElement;
-      const key = input.dataset.opt;
-      if (!key) return;
-      const out = this.node.querySelector(`[data-out="${key}"]`);
-      if (out) out.textContent = `${input.value}%`;
+    this.node.addEventListener('change', (ev) => {
+      const select = ev.target as HTMLSelectElement;
+      if (!select.matches('[data-aggression]')) return;
+      const out = this.node.querySelector('[data-out="aggression"]');
+      if (out) out.textContent = CONFLICT_LEVELS[select.value as ConflictLevel].description;
     });
   }
 
@@ -93,17 +98,16 @@ export class NewGameScreen {
       const seed = this.node.querySelector<HTMLInputElement>('[data-seed]');
       if (seed) seed.value = String(Math.floor(Math.random() * 1e6));
     } else if (target.dataset.act === 'start') {
-      const value = (key: string) => Number(this.node.querySelector<HTMLInputElement>(`[data-opt="${key}"]`)?.value ?? 100) / 100;
+      const checked = (sel: string, fallback: boolean) => this.node.querySelector<HTMLInputElement>(sel)?.checked ?? fallback;
       const seed = Number(this.node.querySelector<HTMLInputElement>('[data-seed]')?.value) || Math.floor(Math.random() * 1e6);
       void this.app.startNew(this.mapId, {
         eraId: this.eraId,
         seed,
         settings: {
-          aggression: value('aggression'),
-          eventFrequency: value('events'),
-          rebellionFrequency: value('rebellions'),
-          diplomacyFrequency: value('diplomacy'),
-          autoPeace: !!this.node.querySelector<HTMLInputElement>('[data-autopeace]')?.checked,
+          aggression: (this.node.querySelector<HTMLSelectElement>('[data-aggression]')?.value ?? DEFAULT_SETTINGS.aggression) as ConflictLevel,
+          rebellions: checked('[data-rebellions]', true),
+          diplomacy: checked('[data-diplomacy]', true),
+          autoPeace: checked('[data-autopeace]', false),
         },
       });
     }

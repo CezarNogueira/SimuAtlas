@@ -2,7 +2,7 @@
 import { browserMapSource, loadMap, loadMapIndex, type MapData, type MapSummary } from '../map/MapData';
 import { SaveManager } from '../persistence/SaveManager';
 import { iconUrl } from '../render/sprites/icons';
-import { createWorld, SAVE_VERSION, type NewGameOptions } from '../sim/createWorld';
+import { createWorld, normalizeSettings, SAVE_VERSION, type NewGameOptions } from '../sim/createWorld';
 import { Simulation } from '../sim/Simulation';
 import type { GameState } from '../state/types';
 import { el, esc, icon, nextFrame } from '../ui/dom';
@@ -116,6 +116,8 @@ export class App {
       }
       this.loading('Restaurando o mundo...');
       await nextFrame();
+      // Saves antigos guardavam os parametros como porcentagens.
+      state.settings = normalizeSettings(state.settings);
       const sim = new Simulation(map, state);
       await nextFrame();
       this.play(map, sim);

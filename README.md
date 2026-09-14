@@ -127,13 +127,25 @@ fraco que o inimigo, rende-se. Guerras paradas levam os exércitos a ofensivas m
 pazes sozinhas" (novo jogo ou configurações) restaura os tratados automáticos.
 
 Só nações de personalidade **expansionista** ou **imperialista** iniciam guerras de conquista, e apenas quando têm poder
-real na sua região: pelo menos 30% do poder da maior potência entre elas e seus vizinhos (população, economia e força
+real na sua região: pelo menos 15% do poder da maior potência entre elas e seus vizinhos (população, economia e força
 militar) e 50% a mais de força que o alvo e seus defensores. Nações fortes com outras personalidades só lutam para se
 defender, em coalizões ou ao lado de aliados, e ao vencer apenas recuperam os estados que eram seus: não anexam o
 território do inimigo. Países fracos (menos de 15% do poder da maior potência vizinha, como microestados e ilhas
 pequenas) não conquistam território: não anexam estados ocupados, não recebem cessões na paz nem na dominação e não
 absorvem vassalos nem uniões. Estados ocupados que nenhum vencedor pode anexar voltam ao dono no fim da guerra. As
 nações do jogador (diplomacia autônoma desativada) não seguem a personalidade, mas também precisam de poder regional.
+
+Parâmetros do mundo (novo jogo ou configurações):
+
+- **Agressividade das nações**: *Pacíficas* (nenhum conflito entre nações), *Padrão* (0,5% de chance por mês de
+  surgir um conflito entre nações: raros, mas possíveis) ou *Agressivas* (75% de chance por mês). Quando o sorteio do
+  mês cria um conflito, ele é iniciado por quem tem motivo e meios: a conquista de uma nação expansionista com poder
+  na região, a guerra de uma coalizão contra um expansionista ou a luta de um vassalo pela independência.
+- **Rebeliões**: ligadas ou desligadas (revoltas, revoluções, guerras civis, colapsos e lutas de vassalos). As ações
+  do jogador de incitar rebeliões e guerras civis funcionam mesmo com elas desligadas.
+- **Atividade diplomática**: ligada ou desligada (alianças, pactos, comércio, garantias, sanções e coalizões
+  decididas pelas próprias nações).
+- **Eventos**: não são configuráveis; há 50% de chance de acontecer um evento no mundo a cada mês.
 
 A guerra tem custos reais para quem luta:
 

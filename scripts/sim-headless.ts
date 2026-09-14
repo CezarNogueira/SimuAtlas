@@ -3,8 +3,9 @@
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { MapData, type MapJson } from '../src/map/MapData';
-import { createWorld } from '../src/sim/createWorld';
-import type { HistoryType } from '../src/state/types';
+import { createWorld, normalizeSettings } from '../src/sim/createWorld';
+import { EVENTS } from '../src/sim/events/definitions';
+import { CONFLICT_LEVELS, type HistoryType } from '../src/state/types';
 import { fmtCompact } from '../src/core/format';
 import { isRebelGoal } from '../src/sim/engines/WarEngine';
 
@@ -19,8 +20,31 @@ const map = new MapData(json, gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.
 
 let t0 = performance.now();
 // AUTOPEACE=1 simula com a paz automatica entre IAs (padrao: guerras so terminam por dominacao).
-const sim = createWorld(map, { eraId, seed, settings: { autoPeace: process.env.AUTOPEACE === '1' } });
+// Parametros por variavel de ambiente: AGGRESSION=pacificas|padrao|agressivas, REBELLIONS=0, DIPLOMACY=0, AUTOPEACE=1.
+const settings = normalizeSettings({
+  aggression: process.env.AGGRESSION ?? 'padrao',
+  rebellions: process.env.REBELLIONS !== '0',
+  diplomacy: process.env.DIPLOMACY !== '0',
+  autoPeace: process.env.AUTOPEACE === '1',
+});
+const sim = createWorld(map, { eraId, seed, settings });
 if (sim.state.settings.autoPeace) console.log('Modo: nações fazem as pazes sozinhas.');
+console.log(`Parâmetros: agressividade ${CONFLICT_LEVELS[settings.aggression].name}, rebeliões ${settings.rebellions ? 'ligadas' : 'desligadas'}, diplomacia ${settings.diplomacy ? 'ligada' : 'desligada'}.`);
+
+// Conflitos entre nacoes (sem rebelioes) por objetivo e eventos disparados.
+const conflicts = new Map<string, number>();
+sim.bus.on('warStarted', (w) => {
+  if (isRebelGoal(w.goal.type)) return;
+  conflicts.set(w.goal.type, (conflicts.get(w.goal.type) ?? 0) + 1);
+});
+let eventsFired = 0;
+for (const def of EVENTS) {
+  const apply = def.apply;
+  def.apply = (ctx) => {
+    eventsFired++;
+    apply(ctx);
+  };
+}
 console.log(`Mundo "${map.name}" criado em ${(performance.now() - t0).toFixed(0)} ms: ${sim.state.countries.length} países, ${map.provinceCount} províncias, ${sim.state.armies.length} exércitos.`);
 
 const counts = new Map<HistoryType, number>();
@@ -127,6 +151,8 @@ const ages = active.map((w) => (sim.day - w.start) / 365).sort((a, b) => b - a);
 console.log(`Guerras encerradas por tipo:`, Object.fromEntries(byEnd), `| ativas: ${active.length}, mais longas: ${ages.slice(0, 5).map((a) => `${a.toFixed(0)}a`).join(', ') || '—'}`);
 console.log(`Estados ganhos (territorio alheio por porte de quem recebe; nucleos = estados recuperados): ${JSON.stringify(gains)}`);
 console.log(`  territorio alheio por personalidade: ${JSON.stringify(Object.fromEntries(foreignByPersonality))} | guerras de conquista por personalidade: ${JSON.stringify(Object.fromEntries(declaredBy))}`);
+const totalConflicts = [...conflicts.values()].reduce((a, b) => a + b, 0);
+console.log(`Conflitos entre nações: ${totalConflicts} em ${years * 12} meses ${JSON.stringify(Object.fromEntries(conflicts))} | eventos: ${eventsFired} (${((eventsFired / (years * 12)) * 100).toFixed(0)}% dos meses)`);
 console.log(`  maiores ganhos: ${[...gainers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id, n]) => `${sim.country(id).name} +${n} (${sim.country(id).personality}, ${sim.country(id).alive ? `poder ${Math.round(sim.countries.regionalPower(id) * 100)}%` : 'extinto'})`).join(' | ')}`);
 for (const w of [...active].sort((a, b) => a.start - b.start).slice(0, 6)) {
   const lastBattle = w.battles.length ? sim.index.battleById.get(w.battles[w.battles.length - 1])?.start ?? -1 : -1;

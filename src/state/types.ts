@@ -464,11 +464,23 @@ export interface StatsState {
   snapshots: { year: number; owners: number[] }[];
 }
 
+export type ConflictLevel = 'pacificas' | 'padrao' | 'agressivas';
+
+// Agressividade das nacoes: chance, a cada mes, de surgir um conflito entre nacoes no mundo.
+export const CONFLICT_LEVELS: Record<ConflictLevel, { name: string; chance: number; description: string }> = {
+  pacificas: { name: 'Pacíficas', chance: 0, description: 'Nenhum conflito entre nações.' },
+  padrao: { name: 'Padrão', chance: 0.005, description: '0,5% de chance por mês de surgir um conflito entre nações: raros, mas possíveis.' },
+  agressivas: { name: 'Agressivas', chance: 0.75, description: '75% de chance por mês de surgir um conflito entre nações.' },
+};
+export const CONFLICT_LEVEL_IDS = Object.keys(CONFLICT_LEVELS) as ConflictLevel[];
+
+// Chance fixa de acontecer um evento no mundo a cada mes.
+export const EVENT_MONTHLY_CHANCE = 0.5;
+
 export interface SimSettings {
-  aggression: number; // multiplicador global de belicosidade (0.25..2)
-  eventFrequency: number; // multiplicador de eventos
-  rebellionFrequency: number; // multiplicador de rebelioes
-  diplomacyFrequency: number; // multiplicador de acoes diplomaticas
+  aggression: ConflictLevel;
+  rebellions: boolean; // revoltas, revolucoes, guerras civis e lutas de vassalos pela independencia
+  diplomacy: boolean; // atividade diplomatica autonoma das nacoes (aliancas, pactos, comercio, coalizoes...)
   // false (padrao): guerras entre nacoes so terminam por dominacao de um lado ou por decisao do jogador.
   // true: as nacoes negociam a paz sozinhas (tratados automaticos, paz branca, paz em separado).
   autoPeace: boolean;
@@ -501,9 +513,8 @@ export interface GameState {
 }
 
 export const DEFAULT_SETTINGS: SimSettings = {
-  aggression: 1,
-  eventFrequency: 1,
-  rebellionFrequency: 1,
-  diplomacyFrequency: 1,
+  aggression: 'padrao',
+  rebellions: true,
+  diplomacy: true,
   autoPeace: false,
 };

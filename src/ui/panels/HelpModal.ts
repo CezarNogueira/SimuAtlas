@@ -45,8 +45,11 @@ export class HelpModal extends BasePanel {
       dois anos de ocupação, passa a pertencer a ele; a nação que perde todo o território é anexada. Para voltar aos tratados
       automáticos, ative "Nações fazem as pazes sozinhas" nas configurações.</p>
       <p><b>Quem conquista</b>: só nações expansionistas ou imperialistas iniciam guerras de conquista, e só se forem
-      uma potência na sua região. As demais só se defendem e, ao vencer, recuperam apenas os estados que eram seus.
+      fortes o bastante na sua região e bem mais fortes que o alvo. As demais só se defendem e, ao vencer, recuperam apenas os estados que eram seus.
       Países fracos não conquistam território; o painel da nação mostra o poder regional.</p>
+      <p><b>Parâmetros do mundo</b>: a agressividade define a chance de surgir um conflito entre nações a cada mês
+      (Pacíficas 0%, Padrão 0,5%, Agressivas 75%). Rebeliões e atividade diplomática podem ser ligadas ou desligadas,
+      e há 50% de chance de acontecer um evento no mundo a cada mês.</p>
       <p><b>Eras e tecnologia</b>: a era vem do ano da simulação. Cada tecnologia só pode surgir na sua data histórica,
       quando um país apto a descobre; depois ela é vendida, licenciada, importada, roubada, capturada na guerra ou
       desenvolvida por outros. Veja tudo no painel de tecnologias (tecla T) e na aba Tecnologia de cada nação.</p>
