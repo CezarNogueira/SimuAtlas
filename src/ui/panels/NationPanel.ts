@@ -136,7 +136,7 @@ export class NationPanel extends BasePanel {
       kv('castle', 'Capital', c.capital < 0 ? '—' : sim.provinces.cityName(c.capital) === sim.provinces.name(c.capital) ? pLink(sim, c.capital) : `${esc(sim.provinces.cityName(c.capital))} <span class="muted">(${pLink(sim, c.capital)})</span>`),
       kv('people', 'População', fmtInt(c.population) + rank('population')),
       kv('chart', 'Crescimento populacional', `<span class="${pg.rate >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(pg.rate, 2)} ao ano</span> <span class="muted">(natural ${fmtPct(pg.base, 2)})</span>`),
-      kv('info', 'Freios', brakes.length ? `<span class="muted">${brakes.join('·')}</span>` : '<span class="muted">nenhum</span>'),
+      kv('info', 'Freios', brakes.length ? `<span class="muted">${brakes.join('<br>')}</span>` : '<span class="muted">nenhum</span>'),
       kv('crown', 'Poder regional', nation ? `<span title="Poder frente à maior potência entre o país e seus vizinhos (população, economia e força militar). Países fracos não conquistam território.">${fmtPct(sim.countries.regionalPower(c.id), 0)} <span class="muted">${({ potencia: 'potência', regional: 'regional', fraco: 'fraco' } as const)[sim.countries.powerTier(c.id)]}</span></span>` : '—'),
       kv('pin', 'Área', fmtArea(c.area) + rank('area')),
       kv('chart', 'PIB', fmtMoney(c.gdp) + rank('gdp')),
