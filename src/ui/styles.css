@@ -174,7 +174,7 @@ input[type='range'].px-range { width: 100%; accent-color: var(--red); }
   position: absolute; left: 8px; right: 8px; top: 8px; height: var(--topbar-h);
   display: flex; align-items: center; gap: 10px; padding: 0 10px;
 }
-.topbar .brand { font-family: 'Jacquarda Bastarda 9', serif; font-size: 30px; color: var(--red); text-shadow: 2px 2px 0 var(--edge); line-height: 1; }
+.topbar .brand { font-size: 30px; color: var(--red); text-shadow: 2px 2px 0 var(--edge); line-height: 1; }
 .topbar .date { font-size: 22px; font-weight: 700; letter-spacing: 1px; min-width: 128px; }
 .topbar .era { font-size: 13px; color: var(--ink-soft); }
 .topbar .speed-tag { padding: 2px 8px; border: 2px solid var(--edge); background: var(--paper-2); font-weight: 700; }

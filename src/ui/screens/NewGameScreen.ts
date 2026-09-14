@@ -55,6 +55,10 @@ export class NewGameScreen {
             <label>Atividade diplomática: <b data-out="diplomacy">100%</b>
               <input class="px-range" type="range" min="25" max="250" step="5" value="100" data-opt="diplomacy">
             </label>
+            <label>Fim das guerras
+              <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-autopeace> Nações fazem as pazes sozinhas</span>
+              <span class="hint">Desligado (padrão): a guerra só termina quando um lado domina o outro ou quando você decide a paz.</span>
+            </label>
           </div>
         </div>
         <footer>
@@ -98,6 +102,7 @@ export class NewGameScreen {
           eventFrequency: value('events'),
           rebellionFrequency: value('rebellions'),
           diplomacyFrequency: value('diplomacy'),
+          autoPeace: !!this.node.querySelector<HTMLInputElement>('[data-autopeace]')?.checked,
         },
       });
     }

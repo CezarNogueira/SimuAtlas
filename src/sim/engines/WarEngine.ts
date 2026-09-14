@@ -1,5 +1,6 @@
 // WAR ENGINE: declaracao de guerra, casus belli, chamada de aliados, war score, exaustao,
-// queda de capitais, paz (cessoes, anexacao, vassalagem, reparacoes, paz branca) e tregua.
+// queda de capitais, dominacao (anexacao de territorio ocupado e fim da guerra quando um lado cai),
+// paz decidida pelo jogador (cessoes, anexacao, vassalagem, reparacoes, paz branca) e tregua.
 import { fmtMoney } from '../../core/format';
 import { clamp } from '../../core/math';
 import { GOVERNMENTS } from '../../data/governments';
@@ -9,6 +10,9 @@ import type { Simulation } from '../Simulation';
 
 const REBEL_GOALS: WarGoalType[] = ['independence', 'revolution', 'restoration', 'civil_war'];
 export const isRebelGoal = (t: WarGoalType) => REBEL_GOALS.includes(t);
+
+// Sem paz automatica, um estado ocupado continuamente por este tempo passa a pertencer ao ocupante.
+export const OCCUPATION_ANNEX_DAYS = 730;
 
 export const GOAL_NAMES: Record<WarGoalType, string> = {
   conquest: 'Conquista territorial',
@@ -175,10 +179,17 @@ export class WarEngine {
     const sim = this.sim;
     const a = war.attackerLeader;
     const d = war.defenderLeader;
+    const autoPeace = sim.state.settings.autoPeace === true;
     const willing = (m: number, friend: number, foe: number, base: number) => {
       const c = sim.country(m);
       if (!c.alive || sim.index.atWar(m, friend) || sim.diplomacy.hasTreaty(m, foe, 'alliance')) return false;
       if (this.sideOf(war, m) >= 0) return false;
+      // Sem paz automatica a guerra so termina com a dominacao: aliados distantes, sem fronteira com os
+      // envolvidos, nao sao arrastados para ela.
+      if (!autoPeace) {
+        const nb = sim.countries.neighbors(m);
+        if (!nb.has(foe) && !nb.has(friend)) return false;
+      }
       const p = PERSONALITIES[c.personality];
       const chance = base + sim.diplomacy.relation(m, friend) / 250 - sim.diplomacy.relation(m, foe) / 400 + p.allianceSeek * 0.15 - c.warExhaustion / 200;
       return sim.rng.chance(clamp(chance, 0.05, 0.95));
@@ -213,11 +224,13 @@ export class WarEngine {
   }
 
   monthly(): void {
+    const autoPeace = this.sim.state.settings.autoPeace === true;
     for (const war of [...this.sim.index.activeWars]) {
       if (!war.active) continue;
       this.updateScore(war);
       if (isRebelGoal(war.goal.type)) this.sim.rebellion.checkWar(war);
-      else this.checkPeace(war);
+      else if (autoPeace) this.checkPeace(war);
+      else this.checkDomination(war);
     }
   }
 
@@ -257,11 +270,25 @@ export class WarEngine {
     }
     war.warscore = clamp(occScore + batScore + goalScore, -100, 100);
     war.occupied = [defV.count, attV.count];
+    // Atividade militar (novas batalhas ou mudancas na ocupacao): guerras paradas geram ofensivas.
+    const activity = `${war.battles.length}:${war.occupied[0]}:${war.occupied[1]}`;
+    if (activity !== war.activityKey) {
+      war.activityKey = activity;
+      war.lastActivity = sim.day;
+    }
     const months = (sim.day - war.start) / 30;
+    const autoPeace = sim.state.settings.autoPeace === true;
     const sides: [number[], { total: number; occupied: number }][] = [[war.attackers, attV], [war.defenders, defV]];
     sides.forEach(([members, vals], s) => {
       const pop = members.reduce((acc, c) => acc + sim.country(c).population, 0);
-      const exh = months * 0.7 + (war.casualties[s] / Math.max(1, pop * 0.015)) * 35 + (vals.occupied / Math.max(1, vals.total)) * 45;
+      const losses = (war.casualties[s] / Math.max(1, pop * 0.015)) * 35;
+      const occupation = (vals.occupied / Math.max(1, vals.total)) * 45;
+      // Sem paz automatica as guerras podem durar decadas: o cansaco vem das perdas (diluidas no tempo)
+      // e da ocupacao, e nao cresce indefinidamente so pela duracao. Rebelioes mantem o cansaco pelo
+      // tempo, que decide seu desfecho.
+      const exh = autoPeace || isRebelGoal(war.goal.type)
+        ? months * 0.7 + losses + occupation
+        : Math.min(20, months * 0.35) + losses / Math.max(1, months / 24) + occupation;
       war.exhaustion[s] = clamp(exh, 0, 100);
       for (const c of members) {
         const country = sim.country(c);
@@ -271,6 +298,11 @@ export class WarEngine {
     });
     war.scoreHistory.push(Math.round(war.warscore));
     if (war.scoreHistory.length > 600) war.scoreHistory.shift();
+  }
+
+  // Dias desde a ultima batalha ou mudanca de ocupacao nesta guerra.
+  daysStatic(war: War): number {
+    return this.sim.day - (war.lastActivity ?? war.start);
   }
 
   controlledCount(c: number): number {
@@ -315,6 +347,136 @@ export class WarEngine {
     } else if (months >= 18) {
       const chance = ((ea + ed) / 200) * 0.15 * ((pa + pd) / 2) + (months > 60 ? 0.05 : 0);
       if (rng.chance(chance)) this.whitePeace(war);
+    }
+  }
+
+  // Guerra sem paz automatica: estados ocupados ha mais de dois anos passam ao ocupante e o pais que perde
+  // o controle de todo o seu territorio e dominado (anexado). A guerra so termina quando o lider de um
+  // lado e dominado ou quando o jogador decide a paz.
+  checkDomination(war: War): void {
+    const sim = this.sim;
+    const provs = sim.state.provinces;
+    for (const side of [0, 1] as const) {
+      const enemies = new Set(side === 0 ? war.defenders : war.attackers);
+      for (const m of [...(side === 0 ? war.attackers : war.defenders)]) {
+        if (!war.active) return;
+        const c = sim.country(m);
+        if (!c.alive || c.kind !== 'nation') continue;
+        for (const p of [...(sim.index.ownedBy[m] ?? [])]) {
+          const ps = provs[p];
+          if (ps.occupiedSince < 0 || sim.day - ps.occupiedSince < OCCUPATION_ANNEX_DAYS || !enemies.has(ps.controller)) continue;
+          if (sim.country(ps.controller).kind !== 'nation') continue;
+          this.annexOccupied(war, p, ps.controller, m);
+          if (!war.active || !c.alive) break;
+        }
+        if (!war.active) return;
+        if (!c.alive) continue;
+        const owned = sim.index.ownedBy[m] ?? [];
+        if (owned.length && owned.every((p) => enemies.has(provs[p].controller))) {
+          this.dominate(war, m, side);
+        } else if (m === (side === 0 ? war.attackerLeader : war.defenderLeader) && owned.length <= 2 && this.daysStatic(war) >= 3 * 365) {
+          // Rendicao incondicional: lider reduzido a no maximo dois estados, sem combates ha tres anos e com
+          // menos de um terco da forca do lado inimigo (que nao o alcanca, mas que ele jamais vencera).
+          const mine = (side === 0 ? war.attackers : war.defenders).reduce((acc, id) => acc + sim.countries.strength(id), 0);
+          const theirs = [...enemies].reduce((acc, id) => acc + sim.countries.strength(id), 0);
+          if (theirs >= Math.max(1, mine) * 3) this.concludeDomination(war, side === 0 ? 'defenders' : 'attackers', m, true);
+        }
+      }
+    }
+  }
+
+  // Meses que faltam para um estado ocupado ser anexado (guerras sem paz automatica).
+  monthsToAnnex(pid: number): number {
+    const ps = this.sim.state.provinces[pid];
+    if (ps.occupiedSince < 0) return -1;
+    return Math.max(0, Math.ceil((OCCUPATION_ANNEX_DAYS - (this.sim.day - ps.occupiedSince)) / 30));
+  }
+
+  private annexOccupied(war: War, p: number, to: number, from: number): void {
+    const sim = this.sim;
+    const text = `${sim.country(to).name} incorporou um estado ${sim.countries.de(from)} após dois anos de ocupação: ${sim.provinces.name(p)}.`;
+    war.log.push({ day: sim.day, text });
+    sim.history.add('conquest', text, { countries: [to, from], province: p, war: war.id, importance: sim.provinces.isCapital(p) ? 2 : 1 });
+    const T = sim.country(to);
+    T.aggressiveExpansion = Math.min(100, T.aggressiveExpansion + 3);
+    sim.provinces.transfer(p, to, 'occupation');
+  }
+
+  // Quem recebe um estado conquistado: o ocupante (se for uma nacao do lado vencedor) ou o lider vencedor.
+  private recipientOf(war: War, pid: number, winners: number[], winLeader: number): number {
+    const ctrl = this.sim.state.provinces[pid].controller;
+    return winners.includes(ctrl) && this.sim.country(ctrl).kind === 'nation' ? ctrl : winLeader;
+  }
+
+  // Dominacao: o pais perdeu todos os seus estados para o lado inimigo e e anexado pelos ocupantes.
+  private dominate(war: War, loser: number, side: 0 | 1): void {
+    const sim = this.sim;
+    if (loser === (side === 0 ? war.attackerLeader : war.defenderLeader)) {
+      this.concludeDomination(war, side === 0 ? 'defenders' : 'attackers', loser);
+      return;
+    }
+    const winners = side === 0 ? war.defenders : war.attackers;
+    const winLeader = side === 0 ? war.defenderLeader : war.attackerLeader;
+    const owned = [...(sim.index.ownedBy[loser] ?? [])].map((p) => ({ p, to: this.recipientOf(war, p, winners, winLeader) }));
+    const counts = new Map<number, number>();
+    for (const o of owned) counts.set(o.to, (counts.get(o.to) ?? 0) + 1);
+    const main = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? winLeader;
+    war.log.push({ day: sim.day, text: `Dominação: ${sim.country(main).name} conquistou todo o território ${sim.countries.de(loser)}.` });
+    // O ocupante principal recebe por ultimo: o fim do pais e creditado a ele.
+    owned.sort((a, b) => (a.to === main ? 1 : 0) - (b.to === main ? 1 : 0));
+    for (const o of owned) sim.provinces.transfer(o.p, o.to, 'occupation');
+  }
+
+  // Fim da guerra porque o lider de um lado foi dominado: sem tratado de paz. O dominado e anexado por
+  // inteiro e os estados que os vencedores ocupavam dos demais derrotados passam aos ocupantes.
+  private concludeDomination(war: War, winnerSide: 'attackers' | 'defenders', loser: number, capitulated = false): void {
+    const sim = this.sim;
+    if (!war.active) return;
+    const provs = sim.state.provinces;
+    const winners = winnerSide === 'attackers' ? war.attackers : war.defenders;
+    const losers = winnerSide === 'attackers' ? war.defenders : war.attackers;
+    const winLeader = winnerSide === 'attackers' ? war.attackerLeader : war.defenderLeader;
+    const W = sim.country(winLeader);
+    const L = sim.country(loser);
+    const ceded: WarResult['ceded'] = [];
+    for (const p of sim.index.ownedBy[loser] ?? []) ceded.push({ province: p, from: loser, to: this.recipientOf(war, p, winners, winLeader) });
+    let spoils = 0;
+    for (const l of losers) {
+      if (l === loser || !sim.country(l).alive) continue;
+      for (const p of sim.index.ownedBy[l] ?? []) {
+        if (!winners.includes(provs[p].controller)) continue;
+        ceded.push({ province: p, from: l, to: this.recipientOf(war, p, winners, winLeader) });
+        spoils++;
+      }
+    }
+    ceded.sort((a, b) => (a.to === winLeader ? 1 : 0) - (b.to === winLeader ? 1 : 0));
+    const parts = [
+      capitulated
+        ? `${L.name} rendeu-se ${sim.countries.to(winLeader)}: todo o seu território foi anexado.`
+        : `${W.name} dominou ${L.name}${L.alive ? ': todo o seu território foi anexado' : ''}.`,
+    ];
+    if (spoils) parts.push(`${spoils === 1 ? 'Um estado ocupado dos aliados derrotados também foi incorporado' : `${spoils} estados ocupados dos aliados derrotados também foram incorporados`}.`);
+    const summary = parts.join(' ');
+    for (const w of winners) {
+      const c = sim.country(w);
+      if (!c.alive) continue;
+      c.warsWon++;
+      c.prestige = Math.min(100, c.prestige + (w === winLeader ? 20 : 8));
+    }
+    for (const l of losers) {
+      const c = sim.country(l);
+      if (!c.alive) continue;
+      c.warsLost++;
+      c.prestige = Math.max(0, c.prestige - 12);
+      c.stability = Math.max(0, c.stability - 8);
+    }
+    const result: WarResult = { winner: winnerSide, ceded, annexed: [loser], vassals: [], reparations: 0, treaty: -1, summary };
+    this.endWar(war, result, { text: `Fim da ${war.name}: ${summary}`, type: 'annexation', importance: 3, noTreaty: true });
+    for (const c of ceded) {
+      if (provs[c.province].owner !== c.from || !sim.country(c.to).alive) continue;
+      sim.provinces.transfer(c.province, c.to, 'occupation');
+      const to = sim.country(c.to);
+      to.aggressiveExpansion = Math.min(100, to.aggressiveExpansion + 2);
     }
   }
 
@@ -466,7 +628,7 @@ export class WarEngine {
     return withOrdinal(base, countNamed(names, base) + 1, white);
   }
 
-  endWar(war: War, result: WarResult, opts: { text?: string; type?: HistoryType; importance?: 1 | 2 | 3 } = {}): void {
+  endWar(war: War, result: WarResult, opts: { text?: string; type?: HistoryType; importance?: 1 | 2 | 3; noTreaty?: boolean } = {}): void {
     const sim = this.sim;
     if (!war.active) return;
     const rebelCrushed = isRebelGoal(war.goal.type) && result.winner !== 'attackers';
@@ -485,16 +647,18 @@ export class WarEngine {
         }
       }
     }
-    const name = this.treatyName(war, result);
+    const name = opts.noTreaty ? war.name : this.treatyName(war, result);
     const members = [...att, ...def].filter((c) => sim.country(c).alive);
     if (!isRebelGoal(war.goal.type)) {
-      const treaty = sim.diplomacy.createTreaty('peace', members, { name, war: war.id, silent: true });
-      result.treaty = treaty.id;
+      if (!opts.noTreaty) {
+        const treaty = sim.diplomacy.createTreaty('peace', members, { name, war: war.id, silent: true });
+        result.treaty = treaty.id;
+      }
       for (const a of att) {
         for (const d of def) {
           if (!sim.country(a).alive || !sim.country(d).alive) continue;
           const years = Math.min(10, 4 + sim.diplomacy.priorWars(a, d));
-          sim.diplomacy.createTreaty('truce', [a, d], { name: `Trégua de ${name}`, years, silent: true });
+          sim.diplomacy.createTreaty('truce', [a, d], { name: opts.noTreaty ? `Trégua após a ${war.name}` : `Trégua de ${name}`, years, silent: true });
         }
       }
     }
@@ -546,12 +710,28 @@ export class WarEngine {
 
   onCountryDestroyed(id: number, by: number): void {
     const sim = this.sim;
+    const autoPeace = sim.state.settings.autoPeace === true;
     for (const war of [...sim.index.activeWars]) {
+      if (!war.active) continue;
       const side = this.sideOf(war, id);
       if (side < 0) continue;
       const list = side === 0 ? war.attackers : war.defenders;
-      list.splice(list.indexOf(id), 1);
       const leaderLost = (side === 0 ? war.attackerLeader : war.defenderLeader) === id;
+      // Sem paz automatica, a queda do lider de um lado encerra a guerra: dominacao se foi o inimigo que o
+      // conquistou; senao (uniao, revolucao...) a guerra perde o sentido e termina sem vencedor.
+      if (leaderLost && !autoPeace && !isRebelGoal(war.goal.type)) {
+        const enemies = side === 0 ? war.defenders : war.attackers;
+        if (by >= 0 && enemies.includes(by)) {
+          this.concludeDomination(war, side === 0 ? 'defenders' : 'attackers', id);
+        } else {
+          const name = sim.country(id).name;
+          this.endWar(war, { winner: 'white', ceded: [], annexed: [], vassals: [], reparations: 0, treaty: -1, summary: `${name} deixou de existir.` }, {
+            text: `Fim da ${war.name}: ${name} deixou de existir.`, noTreaty: true,
+          });
+        }
+        continue;
+      }
+      list.splice(list.indexOf(id), 1);
       if (leaderLost) {
         const remaining = list.filter((c) => sim.country(c).alive);
         if (remaining.length) {
@@ -560,7 +740,10 @@ export class WarEngine {
           else war.defenderLeader = next;
         } else {
           const winner = side === 0 ? 'defenders' : 'attackers';
-          this.endWar(war, { winner, ceded: [], annexed: [id], vassals: [], reparations: 0, treaty: -1, summary: `${sim.country(id).name} deixou de existir.` });
+          const name = sim.country(id).name;
+          this.endWar(war, { winner, ceded: [], annexed: [id], vassals: [], reparations: 0, treaty: -1, summary: `${name} deixou de existir.` }, {
+            text: `Fim da ${war.name}: ${name} deixou de existir.`, noTreaty: true,
+          });
           continue;
         }
       }

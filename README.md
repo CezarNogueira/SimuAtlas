@@ -57,6 +57,15 @@ estado vizinho. Com `STATES_REPORT=<pasta>`, o `build-maps` grava a lista de est
 | Fechar painel / menu do jogo | `Esc` |
 | Salvamento rápido | `Ctrl+S` |
 
+## Guerras
+
+Por padrão, as nações **não fazem as pazes sozinhas**: uma guerra só termina quando um lado domina o outro ou quando
+você decide, no painel da guerra (paz branca ou vitória de um dos lados). Durante a guerra, um estado ocupado por dois
+anos passa a pertencer ao ocupante, a nação que perde o controle de todo o território é anexada e a guerra acaba quando
+o líder de um dos lados é dominado. Um líder reduzido a no máximo dois estados, sem combates há três anos e muito mais
+fraco que o inimigo, rende-se. Guerras paradas levam os exércitos a ofensivas mais ousadas. A opção "Nações fazem as
+pazes sozinhas" (novo jogo ou configurações) restaura os tratados automáticos.
+
 ## Arquitetura
 
 ```

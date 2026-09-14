@@ -363,8 +363,11 @@ export class RebellionEngine {
     const capital = rebel.capital >= 0 && owned.includes(rebel.capital) ? rebel.capital : owned[0];
     const armies = sim.military.armiesOf(rebel.id);
     const government: GovernmentId = info.type === 'civil_war' ? info.newGovernment || target.government : target.tech < 10 && sim.rng.chance(0.4) ? 'monarchy' : 'republic';
+    // Nome do novo pais: o estado da capital; se ja for o nome de uma nacao (estado unico "Bahrein"), a cidade ("Manama").
+    const stateName = sim.provinces.name(capital);
+    const nameTaken = s.countries.some((k) => k.alive && k.name === stateName);
     const nation = sim.countries.create({
-      name: sim.provinces.name(capital), article: '', kind: 'nation', parent: target.id, provinces: owned, capital, government,
+      name: nameTaken ? sim.provinces.cityName(capital) : stateName, article: '', kind: 'nation', parent: target.id, provinces: owned, capital, government,
       culture: s.provinces[capital].culture, religion: s.provinces[capital].religion,
     });
     for (const a of armies) this.transferArmy(a, nation.id);

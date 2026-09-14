@@ -436,7 +436,7 @@ export class DiplomacyEngine {
     const sim = this.sim;
     const existing = sim.state.treaties.find((t) => t.active && t.type === 'coalition' && t.target === target);
     if (existing) {
-      if (!existing.members.includes(founder)) {
+      if (!existing.members.includes(founder) && existing.members.length < 6) {
         existing.members.push(founder);
         this.bump();
         sim.history.add('treaty', `${sim.country(founder).name} aderiu à ${existing.name}.`, { countries: [founder, target], importance: 1 });
@@ -450,6 +450,8 @@ export class DiplomacyEngine {
       if (this.relation(n, target) < 0 && sim.rng.chance(0.3 + p.coalitionJoin * 0.5)) members.push(n);
     }
     if (members.length < 2) return null;
-    return this.createTreaty('coalition', members, { target });
+    // Coalizoes enxutas: o fundador e ate 5 dos vizinhos mais fortes do alvo.
+    const allies = members.slice(1).sort((x, y) => sim.countries.strength(y) - sim.countries.strength(x)).slice(0, 5);
+    return this.createTreaty('coalition', [founder, ...allies], { target });
   }
 }

@@ -33,7 +33,8 @@ export class PopulationEngine {
       const cap = this.capacity(pid);
       const logistic = 1 - ps.population / Math.max(1000, cap);
       let annual = base * terrainF * stabilityF * logistic;
-      if (ps.controller !== ps.owner) annual -= 0.012;
+      // Ocupacao militar (guerras podem durar ate a dominacao, entao o efeito e moderado).
+      if (ps.controller !== ps.owner) annual -= 0.006;
       annual -= ps.devastation * 0.02;
       annual += growthMods[ps.owner];
       if (ps.epidemic > 0) annual -= 0.09;

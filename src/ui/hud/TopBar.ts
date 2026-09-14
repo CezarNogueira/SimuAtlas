@@ -13,7 +13,7 @@ export class TopBar {
   constructor(private readonly ui: GameUI) {
     this.node = el('div', 'px-panel topbar');
     this.node.innerHTML = `
-      <span class="brand">Atlas Vivo</span>
+      <span class="brand">SimuAtlas</span>
       <span class="date lnk" data-part="date" title="Pausar / continuar (Espaço)"></span>
       <span class="era" data-part="era"></span>
       <span class="speed-tag" data-part="speed"></span>

@@ -21,6 +21,15 @@ export class ProvincePanel extends BasePanel {
     this.ui.closeRight();
   }
 
+  // Sem paz automatica, ocupacao por nacao inimiga vira anexacao apos um ano.
+  private annexNote(): string {
+    const sim = this.sim;
+    const ps = sim.state.provinces[this.id];
+    if (sim.state.settings.autoPeace || sim.country(ps.controller)?.kind !== 'nation' || !sim.index.atWar(ps.owner, ps.controller)) return '';
+    const months = sim.wars.monthsToAnnex(this.id);
+    return months < 0 ? '' : ` · anexação em ${months} ${months === 1 ? 'mês' : 'meses'}`;
+  }
+
   protected renderHead(): string {
     const sim = this.sim;
     const mp = sim.map.provinces[this.id];
@@ -46,7 +55,7 @@ export class ProvincePanel extends BasePanel {
     const output = owner ? sim.economy.provinceOutput(this.id, owner) : 0;
     const dados = kvGrid([
       kv('flag', 'Dono', cLink(sim, ps.owner)),
-      kv('swords', 'Controle', occupied ? `${cLink(sim, ps.controller)} <span class="muted">desde ${dateOf(sim, ps.occupiedSince)}</span>` : 'Próprio'),
+      kv('swords', 'Controle', occupied ? `${cLink(sim, ps.controller)} <span class="muted">desde ${dateOf(sim, ps.occupiedSince)}${this.annexNote()}</span>` : 'Próprio'),
       kv('crown', 'Núcleos', ps.cores.map((c) => cLink(sim, c)).join(', ') || '—'),
       kv('house', 'Cidade principal', esc(sim.provinces.cityName(this.id))),
       kv('people', 'População', fmtInt(ps.population)),

@@ -91,10 +91,23 @@ export class AIEngine {
       if (sim.diplomacy.priorWars(c.id, t) > 0 && T.provincesConquered > 0) score += 5;
       if (!best || score > best.score) best = { target: t, score, ratio };
     }
-    const threshold = 45 + (wars.length ? 25 : 0);
+    // Cada guerra em andamento torna uma nova frente menos atraente (guerras podem durar ate a dominacao).
+    const threshold = 45 + (wars.length ? 25 + 15 * (wars.length - 1) : 0);
     if (!best || best.score < threshold) return;
+    // Guerras so terminam com a dominacao: nao declarar contra quem os exercitos nao conseguem alcancar.
+    if (!landNeighbors.has(best.target) && !this.canReach(c, best.target)) return;
     const goal = this.chooseGoal(c, best.target, best.ratio, pers);
     sim.wars.declareWar(c.id, best.target, goal);
+  }
+
+  // Existe rota (terra ou mar, por territorio proprio, aliado ou do alvo) da capital ate a capital do alvo?
+  private canReach(c: Country, t: number): boolean {
+    const sim = this.sim;
+    const target = sim.country(t);
+    if (c.capital < 0 || target.capital < 0) return false;
+    const provs = sim.state.provinces;
+    const access = sim.diplomacy.accessSet(c.id);
+    return !!sim.pathfinder.findPath(c.capital, target.capital, (p) => access.has(provs[p].controller) || provs[p].owner === t, true, 240, 1);
   }
 
   chooseGoal(c: Country, t: number, ratio: number, pers: PersonalityInfo): WarGoal {
@@ -241,7 +254,8 @@ export class AIEngine {
       if (!coalition) return;
       const members = coalition.members.filter((m) => sim.country(m).alive);
       const power = members.reduce((acc, m) => acc + sim.countries.strength(m), 0);
-      if (power > sim.countries.strength(t) * 1.3 && !members.some((m) => sim.index.atWar(m, t)) && rng.chance(0.2)) {
+      const alreadyContained = sim.wars.warsOf(t).some((w) => w.active && w.goal.type === 'coalition');
+      if (power > sim.countries.strength(t) * 1.3 && !alreadyContained && !members.some((m) => sim.index.atWar(m, t)) && rng.chance(0.2)) {
         const leader = members.sort((a, b) => sim.countries.strength(b) - sim.countries.strength(a))[0];
         const lost = sim.country(t).recentChanges.filter((ch) => ch.to === t && members.includes(ch.from)).map((ch) => ch.province);
         const war = sim.wars.declareWar(leader, t, { type: 'coalition', provinces: [...new Set(lost)].slice(0, 8), description: `Conter o expansionismo ${sim.countries.de(t)}` });

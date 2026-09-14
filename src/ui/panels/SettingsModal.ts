@@ -18,7 +18,9 @@ const RENDER_TOGGLES: [keyof RenderSettings, string][] = [
   ['showBattles', 'Marcadores de batalha'],
 ];
 
-const SIM_SLIDERS: [keyof SimSettings, string, number, number][] = [
+type NumericSimKey = Exclude<keyof SimSettings, 'autoPeace'>;
+
+const SIM_SLIDERS: [NumericSimKey, string, number, number][] = [
   ['aggression', 'Agressividade das nações', 25, 200],
   ['eventFrequency', 'Frequência de eventos', 0, 250],
   ['rebellionFrequency', 'Frequência de rebeliões', 0, 250],
@@ -65,7 +67,9 @@ export class SettingsModal extends BasePanel {
       <label><input class="px-check" type="checkbox" data-change="pausewar"${p.pauseOnSelectedWar ? ' checked' : ''}> Pausar quando a nação selecionada entrar em guerra</label>`;
     return (
       sec('Mapa', 'globe', `<div class="settings-grid">${toggles}${armies}</div>`) +
-      sec('Simulação', 'gear', `<div class="settings-grid">${sliders}</div><div class="muted">As mudanças valem imediatamente para este mundo.</div>`) +
+      sec('Simulação', 'gear', `<div class="settings-grid">${sliders}</div>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="px-check" type="checkbox" data-change="autopeace"${s.autoPeace ? ' checked' : ''}> Nações fazem as pazes sozinhas (tratados automáticos)</label>
+        <div class="muted">Desligado: cada guerra continua até um lado dominar o outro ou até você decidir a paz no painel da guerra. As mudanças valem imediatamente para este mundo.</div>`) +
       sec('Interface', 'info', `<div class="settings-grid">${ui}</div>`) +
       `<div class="action"><button class="px-btn" data-action="fit">${icon('target', 16)} Enquadrar mapa</button><button class="px-btn" data-close>Fechar</button></div>`
     );
@@ -87,12 +91,15 @@ export class SettingsModal extends BasePanel {
         ui.saveRenderSettings();
         break;
       case 'sim': {
-        const key = t.dataset.key as keyof SimSettings;
+        const key = t.dataset.key as NumericSimKey;
         this.sim.state.settings[key] = Number(input.value) / 100;
         const out = this.box.querySelector(`[data-out="${key}"]`);
         if (out) out.textContent = `${input.value}%`;
         break;
       }
+      case 'autopeace':
+        this.sim.state.settings.autoPeace = input.checked;
+        break;
       case 'toasts':
         ui.prefs.toastImportance = Number(input.value) as 1 | 2 | 3;
         ui.savePrefs();

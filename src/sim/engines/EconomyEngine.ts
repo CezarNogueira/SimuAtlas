@@ -113,7 +113,11 @@ export class EconomyEngine {
         c.gdpLastYear = c.gdp;
       }
 
-      if (debtRatio > 1.6 && taxes < interest * 1.2) this.bankruptcy(c);
+      if (debtRatio > 1.6 && taxes < interest * 1.2) {
+        // Uma moratoria por vez: sem dinheiro para os soldos durante a crise, as tropas desertam.
+        if (c.modifiers.some((m) => m.id === 'bankruptcy' && m.until > sim.day)) this.desertion(c);
+        else this.bankruptcy(c);
+      }
     }
   }
 
@@ -125,6 +129,16 @@ export class EconomyEngine {
     c.inflation = Math.min(0.8, c.inflation + 0.1);
     c.modifiers.push({ id: 'bankruptcy', name: 'Moratória', until: sim.day + 3 * 365, economy: -0.12, stability: -8 });
     sim.history.add('economy', `${c.name} declarou moratória da dívida pública e mergulhou em crise.`, { countries: [c.id], importance: 2 });
+  }
+
+  // Soldos atrasados: 5% das tropas fora de combate desertam por mes; parte volta a reserva de manpower.
+  private desertion(c: Country): void {
+    const sim = this.sim;
+    for (const a of sim.military.armiesOf(c.id)) {
+      if (a.battle >= 0) continue;
+      const cut = sim.military.applyLosses(a, (a.infantry + a.cavalry + a.artillery) * 0.05);
+      c.manpower = Math.min(c.maxManpower, c.manpower + cut * 0.5);
+    }
   }
 
   // Investimento em infraestrutura quando o tesouro esta muito cheio.

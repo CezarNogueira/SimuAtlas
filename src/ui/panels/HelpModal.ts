@@ -40,7 +40,11 @@ export class HelpModal extends BasePanel {
       declaram guerras, cercam cidades, assinam tratados, se rebelam e desaparecem.</p>
       <p>Cada país é dividido em seus <b>estados</b> reais (estados, províncias ou regiões oficiais, conforme o país).
       As guerras conquistam estados inteiros, e cada cerco acontece na cidade principal do estado.</p>
-      <p>Estados ocupados aparecem listrados com a cor do dono original até o tratado de paz decidir seu destino.
+      <p><b>Guerras não terminam sozinhas</b>: continuam até um lado dominar o outro ou até você decidir a paz no painel
+      da guerra (paz branca ou vitória de um dos lados). Um estado ocupado aparece listrado com a cor do ocupante e, após
+      dois anos de ocupação, passa a pertencer a ele; a nação que perde todo o território é anexada. Para voltar aos tratados
+      automáticos, ative "Nações fazem as pazes sozinhas" nas configurações.</p>
+      <p>
       Cercos mostram uma barra de progresso; batalhas em andamento pulsam no mapa.</p>
       <p>Na aba <b>Ações</b> de cada nação você pode declarar guerras, forçar a paz, formar alianças, incitar rebeliões,
       mudar governos, conceder exércitos e disparar eventos. Desative a <b>diplomacia autônoma</b> para controlar uma nação sozinho.</p>

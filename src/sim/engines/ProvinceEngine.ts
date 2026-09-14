@@ -4,7 +4,8 @@ import { GOVERNMENTS } from '../../data/governments';
 import type { ProvinceState } from '../../state/types';
 import type { Simulation } from '../Simulation';
 
-export type TransferReason = 'conquest' | 'peace' | 'independence' | 'annex' | 'revolt' | 'union' | 'restore' | 'return';
+// occupation: anexacao, durante a guerra, de um estado ja ocupado ha tempo (ou de um pais dominado).
+export type TransferReason = 'conquest' | 'peace' | 'independence' | 'annex' | 'revolt' | 'union' | 'restore' | 'return' | 'occupation';
 
 export class ProvinceEngine {
   constructor(private sim: Simulation) {}
@@ -86,6 +87,9 @@ export class ProvinceEngine {
     if (reason === 'conquest' || reason === 'peace' || reason === 'annex') {
       p.unrest = clamp(p.unrest + 18, 0, 100);
       p.devastation = clamp(p.devastation + 0.08, 0, 1);
+    } else if (reason === 'occupation') {
+      // O choque maior ja veio com a ocupacao; a anexacao formal agita menos.
+      p.unrest = clamp(p.unrest + 8, 0, 100);
     } else {
       p.unrest = clamp(p.unrest * 0.4, 0, 100);
     }
@@ -97,13 +101,13 @@ export class ProvinceEngine {
     const target = sim.country(to);
     target.recentChanges.push(change);
     if (target.recentChanges.length > 30) target.recentChanges.shift();
-    if (reason === 'conquest' || reason === 'peace' || reason === 'annex') target.provincesConquered++;
+    if (reason === 'conquest' || reason === 'peace' || reason === 'annex' || reason === 'occupation') target.provincesConquered++;
     if (target.capital < 0 || sim.province(target.capital).owner !== to) target.capital = id;
     if (from >= 0) {
       const source = sim.country(from);
       source.recentChanges.push(change);
       if (source.recentChanges.length > 30) source.recentChanges.shift();
-      if (reason === 'conquest' || reason === 'peace' || reason === 'annex') source.provincesLost++;
+      if (reason === 'conquest' || reason === 'peace' || reason === 'annex' || reason === 'occupation') source.provincesLost++;
       if (source.capital === id) sim.countries.relocateCapital(from, true);
     }
     sim.bus.emit('provinceChanged', { province: id });
@@ -131,7 +135,7 @@ export class ProvinceEngine {
       target -= p.development / 6;
       target = clamp(target * gov.rebellion * freq, 0, 100);
       p.unrest += (target - p.unrest) * 0.1;
-      if (p.controller !== p.owner) p.devastation = Math.min(1, p.devastation + 0.01);
+      if (p.controller !== p.owner) p.devastation = Math.min(1, p.devastation + 0.006);
       else p.devastation *= 0.94;
       if (p.epidemic > 0) p.epidemic = Math.max(0, p.epidemic - 30);
       if (p.controller === p.owner && c.stability > 30) {

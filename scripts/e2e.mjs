@@ -106,6 +106,17 @@ try {
   await shot('07-zoom-running');
   await page.keyboard.press('Space');
 
+  // Lista de guerras e painel de uma guerra (regras de fim da guerra).
+  await page.keyboard.press('g');
+  await sleep(800);
+  if (await clickIf('.side.left [data-war]')) {
+    await sleep(1000);
+    await shot('07b-war-panel');
+    await page.keyboard.press('Escape');
+  }
+  await page.keyboard.press('g');
+  await sleep(300);
+
   await page.keyboard.press('e');
   await sleep(800);
   if (await clickIf('[data-tab="evolucao"]')) {

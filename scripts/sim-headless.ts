@@ -17,7 +17,9 @@ const gz = gunzipSync(readFileSync(`public/maps/${mapId}/grid.dat`));
 const map = new MapData(json, gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.byteLength) as ArrayBuffer);
 
 let t0 = performance.now();
-const sim = createWorld(map, { eraId, seed });
+// AUTOPEACE=1 simula com a paz automatica entre IAs (padrao: guerras so terminam por dominacao).
+const sim = createWorld(map, { eraId, seed, settings: { autoPeace: process.env.AUTOPEACE === '1' } });
+if (sim.state.settings.autoPeace) console.log('Modo: nações fazem as pazes sozinhas.');
 console.log(`Mundo "${map.name}" criado em ${(performance.now() - t0).toFixed(0)} ms: ${sim.state.countries.length} países, ${map.provinceCount} províncias, ${sim.state.armies.length} exércitos.`);
 
 const counts = new Map<HistoryType, number>();
@@ -69,6 +71,23 @@ for (let y = 1; y <= years; y++) {
 const total = (performance.now() - t0) / 1000;
 console.log(`\n${years} anos simulados em ${total.toFixed(1)} s (${((total * 1000) / (years * 365)).toFixed(2)} ms/dia).`);
 console.log(`Batalhas: ${battles}. Eventos por tipo:`, Object.fromEntries([...counts.entries()].sort((a, b) => b[1] - a[1])));
+const ended = sim.state.wars.filter((w) => !w.active && w.result);
+const byEnd = new Map<string, number>();
+for (const w of ended) {
+  const key = !w.result ? '?' : w.result.treaty >= 0 ? 'tratado' : w.result.annexed.length ? 'dominação' : w.result.winner === 'white' ? 'sem vencedor' : 'rebelião';
+  byEnd.set(key, (byEnd.get(key) ?? 0) + 1);
+}
+const active = sim.index.activeWars;
+const ages = active.map((w) => (sim.day - w.start) / 365).sort((a, b) => b - a);
+console.log(`Guerras encerradas por tipo:`, Object.fromEntries(byEnd), `| ativas: ${active.length}, mais longas: ${ages.slice(0, 5).map((a) => `${a.toFixed(0)}a`).join(', ') || '—'}`);
+for (const w of [...active].sort((a, b) => a.start - b.start).slice(0, 6)) {
+  const lastBattle = w.battles.length ? sim.index.battleById.get(w.battles[w.battles.length - 1])?.start ?? -1 : -1;
+  const names = (ids: number[]) => ids.map((id) => `${sim.country(id).name}${sim.country(id).alive ? '' : '†'}(${sim.country(id).provinceCount})`).join(', ');
+  console.log(
+    `  ${w.name} [${((sim.day - w.start) / 365).toFixed(0)}a, ${w.goal.type}] A: ${names(w.attackers)} | D: ${names(w.defenders)} | ` +
+      `ultima batalha: ${lastBattle >= 0 ? `${((sim.day - lastBattle) / 365).toFixed(1)}a atras` : 'nenhuma'} | ocupados ${w.occupied.join('/')} | exaustao ${w.exhaustion.map((e) => e.toFixed(0)).join('/')}`,
+  );
+}
 const tech = sim.countries.nations().reduce((acc, c) => Math.max(acc, c.tech), 0);
 console.log(`Tecnologia máxima: ${tech.toFixed(1)}`);
 console.log('\nÚltimos acontecimentos importantes:');

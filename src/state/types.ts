@@ -255,6 +255,9 @@ export interface War {
   scoreHistory: number[];
   result: WarResult | null;
   log: WarLogEntry[];
+  // Dia da ultima batalha nova ou mudanca de ocupacao (ausente em saves antigos: usa o inicio da guerra).
+  lastActivity?: number;
+  activityKey?: string;
 }
 
 export interface UnitCounts {
@@ -366,6 +369,9 @@ export interface SimSettings {
   eventFrequency: number; // multiplicador de eventos
   rebellionFrequency: number; // multiplicador de rebelioes
   diplomacyFrequency: number; // multiplicador de acoes diplomaticas
+  // false (padrao): guerras entre nacoes so terminam por dominacao de um lado ou por decisao do jogador.
+  // true: as nacoes negociam a paz sozinhas (tratados automaticos, paz branca, paz em separado).
+  autoPeace: boolean;
 }
 
 export interface GameState {
@@ -394,4 +400,5 @@ export const DEFAULT_SETTINGS: SimSettings = {
   eventFrequency: 1,
   rebellionFrequency: 1,
   diplomacyFrequency: 1,
+  autoPeace: false,
 };
