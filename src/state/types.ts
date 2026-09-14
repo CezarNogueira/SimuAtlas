@@ -102,6 +102,8 @@ export interface Country {
   militaryBudget: number; // fracao desejada da renda
   // Sociedade
   population: number;
+  popGrowthBase?: number; // taxa natural de crescimento sorteada para o ano (1% a 1,5%)
+  popGrowthYear?: number; // ano do sorteio
   stability: number; // 0..100
   corruption: number; // 0..1
   prestige: number; // 0..100

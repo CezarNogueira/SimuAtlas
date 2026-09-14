@@ -57,6 +57,21 @@ estado vizinho. Com `STATES_REPORT=<pasta>`, o `build-maps` grava a lista de est
 | Fechar painel / menu do jogo | `Esc` |
 | Salvamento rápido | `Ctrl+S` |
 
+## População
+
+Todo ano cada país sorteia uma taxa natural de crescimento entre 1% e 1,5% ao ano. A taxa é distribuída pelos meses
+com juros compostos e um leve ciclo sazonal (mais nascimentos na primavera, mais mortes no inverno, quase nada nos
+trópicos), de modo que doze meses nas mesmas condições fecham exatamente a taxa sorteada. A taxa é ajustada à
+situação de cada país e de cada estado:
+
+- **Estabilidade** baixa e **guerra** reduzem os nascimentos.
+- **Terra disponível:** um estado cresce livremente até 80% da sua capacidade de sustento (terreno, tecnologia e
+  desenvolvimento), desacelera até parar em 130% e encolhe se ficar superpovoado.
+- **Ocupação, destruição, epidemias, fome, escassez e inflação descontrolada** tiram pontos da taxa e podem fazer a
+  população diminuir. A medicina reduz o peso de epidemias e fome.
+
+O painel da nação mostra a taxa atual, a taxa natural sorteada e os freios ao crescimento.
+
 ## Guerras
 
 Por padrão, as nações **não fazem as pazes sozinhas**: uma guerra só termina quando um lado domina o outro ou quando

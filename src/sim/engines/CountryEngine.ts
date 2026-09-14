@@ -306,6 +306,7 @@ export class CountryEngine {
       lastWarDay: s.day,
     };
     s.countries.push(c);
+    sim.population.drawGrowth(c);
     sim.index.ensureCountry(id);
     for (const p of opts.provinces) sim.provinces.transfer(p, id, opts.kind === 'rebel' ? 'revolt' : 'independence');
     if (capital >= 0) c.capital = capital;

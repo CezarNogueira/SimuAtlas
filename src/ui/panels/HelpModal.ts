@@ -44,6 +44,8 @@ export class HelpModal extends BasePanel {
       da guerra (paz branca ou vitória de um dos lados). Um estado ocupado aparece listrado com a cor do ocupante e, após
       dois anos de ocupação, passa a pertencer a ele; a nação que perde todo o território é anexada. Para voltar aos tratados
       automáticos, ative "Nações fazem as pazes sozinhas" nas configurações.</p>
+      <p><b>População</b>: cada país cresce de 1% a 1,5% ao ano (taxa sorteada todo ano). Instabilidade, guerra, falta
+      de terras, ocupação, destruição, epidemias e fome reduzem o crescimento; veja os freios no painel da nação.</p>
       <p><b>A guerra cobra seu preço</b>: tropas em campanha e armamentos custam fortunas e são pagos com dívida; a
       mobilização, a destruição e a ocupação fazem faltar produtos e a inflação dispara. Batalhas, cercos, saques e
       ocupação destroem a infraestrutura dos estados, que produzem menos até serem reconstruídos. Sem crédito, os soldos

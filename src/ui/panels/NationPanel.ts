@@ -125,14 +125,21 @@ export class NationPanel extends BasePanel {
     const vassals = sim.state.countries.filter((v) => v.alive && v.overlord === c.id);
     const rebelInfo = c.rebel ? `<div class="banner red">${icon('fire', 20)} Facção rebelde (${esc({ separatist: 'separatista', revolution: 'revolucionária', restoration: 'restauracionista', civil_war: 'guerra civil' }[c.rebel.type])}) contra ${cLink(sim, c.rebel.target)}</div>` : '';
 
+    const pg = sim.population.growthInfo(c);
+    const brakes = ([
+      ['instabilidade', pg.stability], ['guerra', pg.war], ['falta de terras', pg.crowding], ['ocupação', pg.occupation],
+      ['destruição', pg.devastation], ['epidemias', pg.epidemic], ['fome e escassez', pg.hardship],
+    ] as const).filter(([, v]) => v <= -0.00005).map(([label, v]) => `${label} ${fmtSignedPct(v, 2)}`);
     const dados = kvGrid([
       kv('castle', 'Capital', c.capital < 0 ? '—' : sim.provinces.cityName(c.capital) === sim.provinces.name(c.capital) ? pLink(sim, c.capital) : `${esc(sim.provinces.cityName(c.capital))} <span class="muted">(${pLink(sim, c.capital)})</span>`),
       kv('people', 'População', fmtInt(c.population) + rank('population')),
+      kv('chart', 'Crescimento populacional', `<span class="${pg.rate >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(pg.rate, 2)} ao ano</span> <span class="muted">(natural ${fmtPct(pg.base, 2)})</span>`),
+      kv('info', 'Freios ao crescimento', brakes.length ? `<span class="muted">${brakes.join(' · ')}</span>` : '<span class="muted">nenhum</span>'),
       kv('pin', 'Área', fmtArea(c.area) + rank('area')),
       kv('chart', 'PIB', fmtMoney(c.gdp) + rank('gdp')),
       kv('coins', 'PIB per capita', fmtMoney(gdppc)),
       kv('coins', 'Renda média', fmtMoney(avgIncome)),
-      kv('chart', 'Taxa de crescimento', `<span class="${c.growth >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(c.growth)}</span>`),
+      kv('chart', 'Crescimento do PIB', `<span class="${c.growth >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(c.growth)}</span>`),
       kv('building', 'Produção anual', fmtMoney(production * 12)),
       kv('coins', 'Recursos', '') + `<span></span><span class="list">${esc(topRes)}</span>`,
       kv('chest', 'Tesouro', fmtMoney(c.treasury)),

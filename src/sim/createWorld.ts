@@ -207,6 +207,7 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
   const sim = new Simulation(map, state);
   sim.countries.recomputeAll();
   for (const c of state.countries) {
+    sim.population.drawGrowth(c);
     c.manpower = c.maxManpower * 0.6;
     const coastal = sim.index.ownedBy[c.id].filter((p) => map.coastal[p]).length;
     c.navy = coastal > 0 ? Math.max(1, coastal * (0.8 + c.tech / 12) * 0.7) : 0;

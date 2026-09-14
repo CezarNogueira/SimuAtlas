@@ -3,7 +3,7 @@
 export interface TechEffects {
   military: number; // bonus de poder de combate
   economy: number; // bonus de produtividade
-  growth: number; // bonus de crescimento populacional
+  growth: number; // medicina: reduz o peso de epidemias e fome sobre o crescimento populacional
   movement: number; // bonus de velocidade de marcha
   seaRange: number; // alcance naval extra (em rotas)
   siege: number; // bonus de cerco
