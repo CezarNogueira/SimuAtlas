@@ -365,7 +365,9 @@ export class WarEngine {
         for (const p of [...(sim.index.ownedBy[m] ?? [])]) {
           const ps = provs[p];
           if (ps.occupiedSince < 0 || sim.day - ps.occupiedSince < OCCUPATION_ANNEX_DAYS || !enemies.has(ps.controller)) continue;
-          if (sim.country(ps.controller).kind !== 'nation') continue;
+          // Paises fracos ou sem politica expansionista nao incorporam o que ocupam (salvo estados que ja eram seus):
+          // os estados voltam ao dono quando a guerra acabar.
+          if (!sim.countries.canAnnex(ps.controller, p)) continue;
           this.annexOccupied(war, p, ps.controller, m);
           if (!war.active || !c.alive) break;
         }
@@ -402,10 +404,13 @@ export class WarEngine {
     sim.provinces.transfer(p, to, 'occupation');
   }
 
-  // Quem recebe um estado conquistado: o ocupante (se for uma nacao do lado vencedor) ou o lider vencedor.
+  // Quem recebe um estado conquistado: o ocupante (nacao do lado vencedor que pode anexa-lo) ou o lider
+  // vencedor. -1 quando ninguem do lado vencedor pode anexar o estado (fraco ou sem politica expansionista).
   private recipientOf(war: War, pid: number, winners: number[], winLeader: number): number {
-    const ctrl = this.sim.state.provinces[pid].controller;
-    return winners.includes(ctrl) && this.sim.country(ctrl).kind === 'nation' ? ctrl : winLeader;
+    const sim = this.sim;
+    const ctrl = sim.state.provinces[pid].controller;
+    if (winners.includes(ctrl) && sim.countries.canAnnex(ctrl, pid)) return ctrl;
+    return sim.countries.canAnnex(winLeader, pid) ? winLeader : -1;
   }
 
   // Dominacao: o pais perdeu todos os seus estados para o lado inimigo e e anexado pelos ocupantes.
@@ -418,6 +423,8 @@ export class WarEngine {
     const winners = side === 0 ? war.defenders : war.attackers;
     const winLeader = side === 0 ? war.defenderLeader : war.attackerLeader;
     const owned = [...(sim.index.ownedBy[loser] ?? [])].map((p) => ({ p, to: this.recipientOf(war, p, winners, winLeader) }));
+    // Sem vencedor que possa anexar, os estados seguem apenas ocupados ate o fim da guerra.
+    if (owned.some((o) => o.to < 0)) return;
     const counts = new Map<number, number>();
     for (const o of owned) counts.set(o.to, (counts.get(o.to) ?? 0) + 1);
     const main = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? winLeader;
@@ -439,21 +446,35 @@ export class WarEngine {
     const W = sim.country(winLeader);
     const L = sim.country(loser);
     const ceded: WarResult['ceded'] = [];
-    for (const p of sim.index.ownedBy[loser] ?? []) ceded.push({ province: p, from: loser, to: this.recipientOf(war, p, winners, winLeader) });
+    // Estados que nenhum vencedor pode anexar permanecem com o derrotado.
+    let kept = 0;
+    for (const p of sim.index.ownedBy[loser] ?? []) {
+      const to = this.recipientOf(war, p, winners, winLeader);
+      if (to < 0) kept++;
+      else ceded.push({ province: p, from: loser, to });
+    }
     let spoils = 0;
     for (const l of losers) {
       if (l === loser || !sim.country(l).alive) continue;
       for (const p of sim.index.ownedBy[l] ?? []) {
         if (!winners.includes(provs[p].controller)) continue;
-        ceded.push({ province: p, from: l, to: this.recipientOf(war, p, winners, winLeader) });
+        const to = this.recipientOf(war, p, winners, winLeader);
+        if (to < 0) continue;
+        ceded.push({ province: p, from: l, to });
         spoils++;
       }
     }
     ceded.sort((a, b) => (a.to === winLeader ? 1 : 0) - (b.to === winLeader ? 1 : 0));
+    const ownCeded = ceded.filter((c) => c.from === loser).length;
+    const block = sim.countries.conquestBlock(winLeader);
     const parts = [
-      capitulated
-        ? `${L.name} rendeu-se ${sim.countries.to(winLeader)}: todo o seu território foi anexado.`
-        : `${W.name} dominou ${L.name}${L.alive ? ': todo o seu território foi anexado' : ''}.`,
+      kept > 0
+        ? ownCeded > 0
+          ? `${W.name} derrotou ${L.name} e os vencedores recuperaram ou incorporaram parte do seu território; o restante foi devolvido${block ? ` (${W.name} ${block})` : ''}.`
+          : `${W.name} derrotou ${L.name}, mas não anexou o seu território${block ? `: ${block}` : ''}.`
+        : capitulated
+          ? `${L.name} rendeu-se ${sim.countries.to(winLeader)}: todo o seu território foi anexado.`
+          : `${W.name} dominou ${L.name}${L.alive ? ': todo o seu território foi anexado' : ''}.`,
     ];
     if (spoils) parts.push(`${spoils === 1 ? 'Um estado ocupado dos aliados derrotados também foi incorporado' : `${spoils} estados ocupados dos aliados derrotados também foram incorporados`}.`);
     const summary = parts.join(' ');
@@ -470,8 +491,8 @@ export class WarEngine {
       c.prestige = Math.max(0, c.prestige - 12);
       c.stability = Math.max(0, c.stability - 8);
     }
-    const result: WarResult = { winner: winnerSide, ceded, annexed: [loser], vassals: [], reparations: 0, treaty: -1, summary };
-    this.endWar(war, result, { text: `Fim da ${war.name}: ${summary}`, type: 'annexation', importance: 3, noTreaty: true });
+    const result: WarResult = { winner: winnerSide, ceded, annexed: kept > 0 ? [] : [loser], vassals: [], reparations: 0, treaty: -1, summary };
+    this.endWar(war, result, { text: `Fim da ${war.name}: ${summary}`, type: kept > 0 ? 'war_ended' : 'annexation', importance: kept > 0 ? 2 : 3, noTreaty: true });
     for (const c of ceded) {
       if (provs[c.province].owner !== c.from || !sim.country(c.to).alive) continue;
       sim.provinces.transfer(c.province, c.to, 'occupation');
@@ -500,13 +521,18 @@ export class WarEngine {
     const occupiedByWinners = loserOwned.filter((p) => winners.has(provs[p].controller));
     const allOccupied = loserOwned.length > 0 && occupiedByWinners.length === loserOwned.length;
     const goal = war.goal.type;
+    // Paises fracos ou sem politica expansionista nao recebem territorio alheio: o estado vai ao lider vencedor, se
+    // ele puder anexa-lo, ou fica com o dono.
+    const winnerCanConquer = sim.countries.canConquer(winLeader) && sim.countries.wantsConquest(winLeader);
     const recipientOf = (p: number) => {
       const ctrl = provs[p].controller;
-      return winners.has(ctrl) && sim.country(ctrl).kind === 'nation' ? ctrl : winLeader;
+      if (winners.has(ctrl) && sim.countries.canAnnex(ctrl, p)) return ctrl;
+      return sim.countries.canAnnex(winLeader, p) ? winLeader : -1;
     };
     const parts: string[] = [];
 
     const annex =
+      winnerCanConquer &&
       winnerSide === 'attackers' &&
       L.kind === 'nation' &&
       allOccupied &&
@@ -524,7 +550,7 @@ export class WarEngine {
       } else {
         parts.push(`${W.name} anexou ${L.name}.`);
       }
-    } else if (goal === 'subjugate' && winnerSide === 'attackers' && score >= 60 && L.overlord < 0) {
+    } else if (goal === 'subjugate' && winnerSide === 'attackers' && score >= 60 && L.overlord < 0 && winnerCanConquer) {
       result.vassals.push(loseLeader);
       parts.push(`${L.name} tornou-se vassalo ${sim.countries.de(winLeader)}.`);
     } else {
@@ -542,13 +568,15 @@ export class WarEngine {
       candidates.sort((x, y) => (goalSet.has(y) ? 1 : 0) - (goalSet.has(x) ? 1 : 0) || adjacency(y) - adjacency(x) || sim.provinces.value(y) - sim.provinces.value(x));
       const takenBy = new Map<number, number>();
       for (const p of candidates) {
+        const to = recipientOf(p);
+        if (to < 0) continue;
         const cost = this.provinceCost(p);
         const owner = provs[p].owner;
         const ownerCap = Math.max(1, Math.floor((sim.index.ownedBy[owner]?.length ?? 1) * 0.35));
         if (cost > budget || (takenBy.get(owner) ?? 0) >= (owner === loseLeader ? maxTake : ownerCap)) continue;
         budget -= cost;
         takenBy.set(owner, (takenBy.get(owner) ?? 0) + 1);
-        result.ceded.push({ province: p, from: owner, to: recipientOf(p) });
+        result.ceded.push({ province: p, from: owner, to });
       }
       if (budget >= 10 && L.treasury > 0) {
         const amount = Math.min(L.treasury * 0.5, Math.max(0, L.income) * 6) * Math.min(1, budget / 60);

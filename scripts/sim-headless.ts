@@ -6,6 +6,7 @@ import { MapData, type MapJson } from '../src/map/MapData';
 import { createWorld } from '../src/sim/createWorld';
 import type { HistoryType } from '../src/state/types';
 import { fmtCompact } from '../src/core/format';
+import { isRebelGoal } from '../src/sim/engines/WarEngine';
 
 const mapId = process.argv[2] ?? 'europe';
 const years = Number(process.argv[3] ?? 50);
@@ -31,6 +32,29 @@ sim.bus.on('history', (e) => {
   if (e.text.startsWith('Escassez')) hardships.escassez++;
   else if (e.text.includes('afunda em dívidas')) hardships.divida++;
   else if (e.text.includes('moratória')) hardships.moratoria++;
+});
+
+// Ganhos territoriais por porte de quem recebe (conquista, paz, ocupacao, anexacao e uniao) e guerras de conquista
+// declaradas por personalidade.
+const gains = { fraco: 0, regional: 0, potencia: 0, nucleos: 0 };
+const foreignByPersonality = new Map<string, number>();
+const gainers = new Map<number, number>();
+sim.bus.on('provinceTransferred', (e) => {
+  if (!['conquest', 'peace', 'annex', 'occupation', 'union'].includes(e.reason)) return;
+  if (e.reason !== 'union' && sim.state.provinces[e.province].cores.includes(e.to)) {
+    gains.nucleos++;
+    return;
+  }
+  gains[sim.countries.powerTier(e.to)]++;
+  const p = sim.country(e.to).personality;
+  foreignByPersonality.set(p, (foreignByPersonality.get(p) ?? 0) + 1);
+  gainers.set(e.to, (gainers.get(e.to) ?? 0) + 1);
+});
+const declaredBy = new Map<string, number>();
+sim.bus.on('warStarted', (w) => {
+  if (isRebelGoal(w.goal.type) || w.goal.type === 'coalition') return;
+  const p = sim.country(w.attackerLeader).personality;
+  declaredBy.set(p, (declaredBy.get(p) ?? 0) + 1);
 });
 
 function integrity(): string[] {
@@ -95,12 +119,15 @@ console.log(`Batalhas: ${battles}. Eventos por tipo:`, Object.fromEntries([...co
 const ended = sim.state.wars.filter((w) => !w.active && w.result);
 const byEnd = new Map<string, number>();
 for (const w of ended) {
-  const key = !w.result ? '?' : w.result.treaty >= 0 ? 'tratado' : w.result.annexed.length ? 'dominação' : w.result.winner === 'white' ? 'sem vencedor' : 'rebelião';
+  const key = !w.result ? '?' : w.result.treaty >= 0 ? 'tratado' : w.result.annexed.length ? 'dominação' : w.result.winner === 'white' ? 'sem vencedor' : isRebelGoal(w.goal.type) ? 'rebelião' : 'vitória sem anexação';
   byEnd.set(key, (byEnd.get(key) ?? 0) + 1);
 }
 const active = sim.index.activeWars;
 const ages = active.map((w) => (sim.day - w.start) / 365).sort((a, b) => b - a);
 console.log(`Guerras encerradas por tipo:`, Object.fromEntries(byEnd), `| ativas: ${active.length}, mais longas: ${ages.slice(0, 5).map((a) => `${a.toFixed(0)}a`).join(', ') || '—'}`);
+console.log(`Estados ganhos (territorio alheio por porte de quem recebe; nucleos = estados recuperados): ${JSON.stringify(gains)}`);
+console.log(`  territorio alheio por personalidade: ${JSON.stringify(Object.fromEntries(foreignByPersonality))} | guerras de conquista por personalidade: ${JSON.stringify(Object.fromEntries(declaredBy))}`);
+console.log(`  maiores ganhos: ${[...gainers.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id, n]) => `${sim.country(id).name} +${n} (${sim.country(id).personality}, ${sim.country(id).alive ? `poder ${Math.round(sim.countries.regionalPower(id) * 100)}%` : 'extinto'})`).join(' | ')}`);
 for (const w of [...active].sort((a, b) => a.start - b.start).slice(0, 6)) {
   const lastBattle = w.battles.length ? sim.index.battleById.get(w.battles[w.battles.length - 1])?.start ?? -1 : -1;
   const names = (ids: number[]) => ids.map((id) => `${sim.country(id).name}${sim.country(id).alive ? '' : '†'}(${sim.country(id).provinceCount})`).join(', ');

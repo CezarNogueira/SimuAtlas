@@ -126,6 +126,15 @@ o líder de um dos lados é dominado. Um líder reduzido a no máximo dois estad
 fraco que o inimigo, rende-se. Guerras paradas levam os exércitos a ofensivas mais ousadas. A opção "Nações fazem as
 pazes sozinhas" (novo jogo ou configurações) restaura os tratados automáticos.
 
+Só nações de personalidade **expansionista** ou **imperialista** iniciam guerras de conquista, e apenas quando têm poder
+real na sua região: pelo menos 30% do poder da maior potência entre elas e seus vizinhos (população, economia e força
+militar) e 50% a mais de força que o alvo e seus defensores. Nações fortes com outras personalidades só lutam para se
+defender, em coalizões ou ao lado de aliados, e ao vencer apenas recuperam os estados que eram seus: não anexam o
+território do inimigo. Países fracos (menos de 15% do poder da maior potência vizinha, como microestados e ilhas
+pequenas) não conquistam território: não anexam estados ocupados, não recebem cessões na paz nem na dominação e não
+absorvem vassalos nem uniões. Estados ocupados que nenhum vencedor pode anexar voltam ao dono no fim da guerra. As
+nações do jogador (diplomacia autônoma desativada) não seguem a personalidade, mas também precisam de poder regional.
+
 A guerra tem custos reais para quem luta:
 
 - **Dívida:** tropas em campanha custam de 2,3 a 3,5 vezes mais (soldos, armamentos, munição e provisões). O governo

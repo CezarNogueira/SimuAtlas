@@ -5,10 +5,11 @@ import { clamp } from '../../core/math';
 import { CULTURES } from '../../data/cultures';
 import { GOVERNMENTS } from '../../data/governments';
 import { IDEOLOGIES } from '../../data/ideologies';
-import { PERSONALITIES, type PersonalityInfo } from '../../data/personalities';
+import { EXPANSIONIST_PERSONALITIES, PERSONALITIES, type PersonalityInfo } from '../../data/personalities';
 import { RELIGIONS } from '../../data/religions';
 import type { Country, WarGoal } from '../../state/types';
 import type { Simulation } from '../Simulation';
+import { ATTACK_POWER } from './CountryEngine';
 
 export class AIEngine {
   constructor(private sim: Simulation) {}
@@ -54,6 +55,8 @@ export class AIEngine {
     const rng = sim.rng;
     const pers = PERSONALITIES[c.personality];
     const wars = sim.wars.warsOf(c.id);
+    // Guerras de conquista sao iniciativa exclusiva de personalidades expansionistas com poder real na sua regiao.
+    if (!EXPANSIONIST_PERSONALITIES.has(c.personality) || sim.countries.regionalPower(c.id) < ATTACK_POWER) return;
     if (sim.day < 540) return;
     if (wars.length >= 2 || c.warExhaustion > 35 || c.stability < 25 || c.overlord >= 0 || c.provinceCount === 0) return;
     // Economia arrasada por guerras anteriores: sem dinheiro nem credito para outra.
@@ -75,7 +78,7 @@ export class AIEngine {
       if (!byLand && c.navy < 1) continue;
       const ratio = myPower / Math.max(1, this.defensivePower(t));
       const distracted = sim.index.isAtWar(t);
-      if (ratio < 1.15 && !(distracted && ratio > 0.8)) continue;
+      if (ratio < 1.5 && !(distracted && ratio > 1.2)) continue;
       const rel = sim.diplomacy.relation(c.id, t);
       let score = aggression * 40 + clamp((ratio - 1) * 25, -20, 60) - rel * 0.35;
       score -= c.aggressiveExpansion * 0.4 + nonCore * 25 + c.warExhaustion * 0.5 + debtRatio * 20 + c.inflation * 50;

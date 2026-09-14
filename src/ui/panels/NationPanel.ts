@@ -4,7 +4,7 @@ import { fmtArea, fmtCompact, fmtDec, fmtInt, fmtMoney, fmtPct, fmtSignedPct } f
 import { CULTURES } from '../../data/cultures';
 import { GOVERNMENT_IDS, GOVERNMENTS } from '../../data/governments';
 import { IDEOLOGIES } from '../../data/ideologies';
-import { PERSONALITIES, PERSONALITY_IDS } from '../../data/personalities';
+import { EXPANSIONIST_PERSONALITIES, PERSONALITIES, PERSONALITY_IDS } from '../../data/personalities';
 import { RELIGIONS } from '../../data/religions';
 import { RESOURCES } from '../../data/resources';
 import { terrainInfo } from '../../data/terrain';
@@ -136,7 +136,8 @@ export class NationPanel extends BasePanel {
       kv('castle', 'Capital', c.capital < 0 ? '—' : sim.provinces.cityName(c.capital) === sim.provinces.name(c.capital) ? pLink(sim, c.capital) : `${esc(sim.provinces.cityName(c.capital))} <span class="muted">(${pLink(sim, c.capital)})</span>`),
       kv('people', 'População', fmtInt(c.population) + rank('population')),
       kv('chart', 'Crescimento populacional', `<span class="${pg.rate >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(pg.rate, 2)} ao ano</span> <span class="muted">(natural ${fmtPct(pg.base, 2)})</span>`),
-      kv('info', 'Freios ao crescimento', brakes.length ? `<span class="muted">${brakes.join(' · ')}</span>` : '<span class="muted">nenhum</span>'),
+      kv('info', 'Freios', brakes.length ? `<span class="muted">${brakes.join('·')}</span>` : '<span class="muted">nenhum</span>'),
+      kv('crown', 'Poder regional', nation ? `<span title="Poder frente à maior potência entre o país e seus vizinhos (população, economia e força militar). Países fracos não conquistam território.">${fmtPct(sim.countries.regionalPower(c.id), 0)} <span class="muted">${({ potencia: 'potência', regional: 'regional', fraco: 'fraco' } as const)[sim.countries.powerTier(c.id)]}</span></span>` : '—'),
       kv('pin', 'Área', fmtArea(c.area) + rank('area')),
       kv('chart', 'PIB', fmtMoney(c.gdp) + rank('gdp')),
       kv('coins', 'PIB per capita', fmtMoney(gdppc)),
@@ -145,7 +146,6 @@ export class NationPanel extends BasePanel {
       kv('building', 'Produção anual', fmtMoney(production * 12)),
       kv('coins', 'Recursos', '') + `<span></span><span class="list">${esc(topRes)}</span>`,
       kv('chest', 'Tesouro', fmtMoney(c.treasury)),
-      kv('helmet', 'Manpower', `${fmtCompact(c.manpower)} / ${fmtCompact(c.maxManpower)}`),
     ]);
     const sociedade = kvGrid([
       kv('scales', 'Estabilidade', `${Math.round(c.stability)}%`), barRow(c.stability / 100, 'var(--green)'),
@@ -160,7 +160,7 @@ export class NationPanel extends BasePanel {
       kv('book', 'Ideologia', esc(IDEOLOGIES[c.ideology].name)),
       kv('temple', 'Religião', esc(RELIGIONS[c.religion].name)),
       kv('people', 'Cultura', esc(CULTURES[c.culture].name)),
-      kv('info', 'Personalidade (IA)', `<span title="${esc(pers.description)}">${esc(pers.name)}</span>`),
+      kv('info', 'Personalidade (IA)', `<span title="${esc(pers.description)}">${esc(pers.name)}</span>${EXPANSIONIST_PERSONALITIES.has(c.personality) ? '' : ' <span class="muted">(não inicia conquistas)</span>'}`),
       kv('gear', 'Nível tecnológico', `${fmtDec(c.tech)}${rank('tech')}`),
       kv('gear', 'Pesquisa principal', mainResearch ? techLink(sim, mainResearch[0]) : '—'),
       kv('sword', 'Poder militar', fmtCompact(sim.countries.strength(c.id)) + rank('army')),

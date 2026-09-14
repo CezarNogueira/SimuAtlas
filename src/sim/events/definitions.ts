@@ -296,7 +296,7 @@ export const EVENTS: EventDefinition[] = [
   },
   {
     id: 'annexation', name: 'Anexação diplomática', category: 'política', chance: 0.0012,
-    weight: ({ sim, c }) => (sim.state.countries.some((v) => v.alive && v.overlord === c.id && sim.diplomacy.relation(v.id, c.id) >= 40) ? 1.5 : 0),
+    weight: ({ sim, c }) => (sim.countries.canConquer(c.id) && sim.countries.wantsConquest(c.id) && sim.state.countries.some((v) => v.alive && v.overlord === c.id && sim.diplomacy.relation(v.id, c.id) >= 40) ? 1.5 : 0),
     apply: (ctx) => {
       const { c, sim } = ctx;
       const v = sim.state.countries.find((x) => x.alive && x.overlord === c.id && sim.diplomacy.relation(x.id, c.id) >= 40);
@@ -310,7 +310,7 @@ export const EVENTS: EventDefinition[] = [
   {
     id: 'union', name: 'União de nações', category: 'política', chance: 0.0006,
     weight: ({ sim, c }) =>
-      sim.diplomacy.partners(c.id, 'alliance').some((a) => {
+      sim.countries.canConquer(c.id) && sim.diplomacy.partners(c.id, 'alliance').some((a) => {
         const o = sim.country(a);
         return o.alive && o.culture === c.culture && o.provinceCount <= c.provinceCount && c.provinceCount <= 6 && sim.diplomacy.relation(a, c.id) >= 60 && !sim.index.isAtWar(a) && !sim.index.isAtWar(c.id);
       }) ? 1 : 0,

@@ -31,8 +31,21 @@ export interface CreateCountryOptions {
   code?: string;
 }
 
+import { EXPANSIONIST_PERSONALITIES } from '../../data/personalities';
+
+// Poder regional minimo para conquistar territorio e para iniciar uma guerra de conquista.
+export const WEAK_POWER = 0.15;
+export const ATTACK_POWER = 0.3;
+// Abaixo deste poder absoluto (fracao da maior potencia do mapa), o pais e fraco mesmo cercado de paises minusculos.
+const MIN_ABSOLUTE_POWER = 0.02;
+
+export type PowerTier = 'potencia' | 'regional' | 'fraco';
+
 export class CountryEngine {
   private neighborCache = new Map<number, { version: number; set: Set<number> }>();
+  private powerKey = -1;
+  private rawPower = new Float64Array(0);
+  private regional = new Float64Array(0);
 
   constructor(private sim: Simulation) {}
 
@@ -105,6 +118,74 @@ export class CountryEngine {
       }
     }
     return this.strengthCache[id] ?? 0;
+  }
+
+  // Poder regional (0..1): populacao, economia e forca militar do pais comparadas as da maior potencia entre ele e
+  // seus vizinhos (por terra ou mar). Um pais minusculo ao lado de grandes potencias tem poder regional quase nulo.
+  regionalPower(id: number): number {
+    const s = this.sim.state;
+    const key = Math.floor(s.day / 30);
+    if (key !== this.powerKey || this.regional.length < s.countries.length) this.refreshPower(key);
+    return this.regional[id] ?? 0;
+  }
+
+  private refreshPower(key: number): void {
+    const s = this.sim.state;
+    this.powerKey = key;
+    const nations = this.nations();
+    let maxPop = 1;
+    let maxGdp = 1;
+    let maxStr = 1;
+    for (const c of nations) {
+      maxPop = Math.max(maxPop, c.population);
+      maxGdp = Math.max(maxGdp, c.gdp);
+      maxStr = Math.max(maxStr, this.strength(c.id));
+    }
+    const n = s.countries.length;
+    this.rawPower = new Float64Array(n);
+    for (const c of nations) {
+      this.rawPower[c.id] = 0.4 * (c.population / maxPop) + 0.35 * (Math.max(0, c.gdp) / maxGdp) + 0.25 * (this.strength(c.id) / maxStr);
+    }
+    this.regional = new Float64Array(n);
+    for (const c of nations) {
+      const own = this.rawPower[c.id];
+      let top = own;
+      for (const other of this.neighbors(c.id)) top = Math.max(top, this.rawPower[other] ?? 0);
+      this.regional[c.id] = own < MIN_ABSOLUTE_POWER ? Math.min(own / Math.max(top, 1e-9), WEAK_POWER * 0.5) : top > 0 ? own / top : 0;
+    }
+  }
+
+  powerTier(id: number): PowerTier {
+    const p = this.regionalPower(id);
+    return p >= 0.6 ? 'potencia' : p >= WEAK_POWER ? 'regional' : 'fraco';
+  }
+
+  // Paises fracos nao conquistam territorio: nao anexam ocupacoes, nao recebem cessoes nem vassalos.
+  canConquer(id: number): boolean {
+    const c = this.get(id);
+    return !!c?.alive && c.kind === 'nation' && this.regionalPower(id) >= WEAK_POWER;
+  }
+
+  // Conquistar faz parte da politica do pais: personalidade expansionista/imperialista ou nacao do jogador.
+  wantsConquest(id: number): boolean {
+    const c = this.get(id);
+    return !c.ai || EXPANSIONIST_PERSONALITIES.has(c.personality);
+  }
+
+  // Quem pode incorporar um estado tomado na guerra: qualquer nacao recupera estados que sao seus (nucleos);
+  // territorio alheio so vai para paises com poder regional e politica expansionista.
+  canAnnex(id: number, pid: number): boolean {
+    const c = this.get(id);
+    if (!c?.alive || c.kind !== 'nation') return false;
+    if (this.sim.state.provinces[pid].cores.includes(id)) return true;
+    return this.canConquer(id) && this.wantsConquest(id);
+  }
+
+  // Por que o pais nao anexa territorio alheio ('' quando pode).
+  conquestBlock(id: number): string {
+    if (!this.canConquer(id)) return 'não tem poder para isso';
+    if (!this.wantsConquest(id)) return 'conquistas não fazem parte da sua política';
+    return '';
   }
 
   // Paises vizinhos por terra ou rota maritima.
