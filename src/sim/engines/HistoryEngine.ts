@@ -40,6 +40,8 @@ export const HISTORY_TYPE_NAMES: Record<HistoryType, string> = {
   destroyed: 'Extinção',
   diplomacy: 'Diplomacia',
   disaster: 'Desastre',
+  era: 'Nova era',
+  espionage: 'Espionagem',
 };
 
 export class HistoryEngine {

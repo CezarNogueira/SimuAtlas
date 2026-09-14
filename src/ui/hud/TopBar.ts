@@ -1,7 +1,6 @@
 // Barra superior: data, era, velocidade e indicadores globais do mundo.
 import { formatDate } from '../../core/calendar';
 import { fmtCompact } from '../../core/format';
-import { eraName } from '../../data/techs';
 import { isRebelGoal } from '../../sim/engines/WarEngine';
 import { el, esc, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
@@ -46,16 +45,15 @@ export class TopBar {
     const sim = ui.sim;
     const s = sim.state;
     this.set('date', formatDate(s.day, s.startYear));
-    let maxTech = 0;
     let pop = 0;
     let nations = 0;
     for (const c of s.countries) {
       if (!c.alive || c.kind !== 'nation') continue;
       nations++;
       pop += c.population;
-      maxTech = Math.max(maxTech, c.tech);
     }
-    this.set('era', esc(eraName(maxTech)));
+    // A era e definida pelo ano da simulacao.
+    this.set('era', esc(sim.eras.current().name));
     const loop = ui.loop;
     const tag = this.node.querySelector<HTMLElement>('[data-part="speed"]');
     tag?.classList.toggle('paused', loop.paused);

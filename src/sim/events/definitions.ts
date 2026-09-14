@@ -238,13 +238,17 @@ export const EVENTS: EventDefinition[] = [
     },
   },
   {
-    id: 'tech_discovery', name: 'Descoberta tecnológica', category: 'descoberta', chance: 0.001,
+    id: 'tech_discovery', name: 'Avanço científico', category: 'descoberta', chance: 0.001,
     weight: ({ c }) => 0.5 + c.stability / 100,
     apply: (ctx) => {
-      const { c, rng, sim } = ctx;
-      c.tech += rng.float(0.2, 0.5);
+      const { c, sim } = ctx;
+      // Acelera o projeto de pesquisa mais adiantado (sem antecipar nenhuma tecnologia antes da sua data historica).
+      const t = sim.technology.research.breakthrough(c);
       c.prestige = Math.min(100, c.prestige + 5);
-      history(ctx, `Cientistas ${sim.countries.de(c.id)} alcançam um grande avanço tecnológico.`, imp(c), -1, 'tech');
+      const text = t
+        ? `Cientistas ${sim.countries.de(c.id)} alcançam um grande avanço nas pesquisas sobre ${sim.technology.db.phrase(t)}.`
+        : `Cientistas ${sim.countries.de(c.id)} alcançam um grande avanço científico.`;
+      history(ctx, text, imp(c), -1, 'tech');
     },
   },
   {
@@ -254,8 +258,8 @@ export const EVENTS: EventDefinition[] = [
       const p = randomProvince(ctx);
       if (p < 0) return;
       const options: ResourceId[] = ['gold', 'silver', 'gems', 'copper', 'iron'];
-      if (c.tech >= 12) options.push('coal');
-      if (c.tech >= 18) options.push('oil', 'oil');
+      if (sim.technology.resourceUnlocked(c, 'coal')) options.push('coal');
+      if (sim.technology.resourceUnlocked(c, 'oil')) options.push('oil', 'oil');
       const r = rng.pick(options);
       const ps = sim.state.provinces[p];
       ps.resource = r;

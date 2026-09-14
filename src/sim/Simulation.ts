@@ -22,7 +22,8 @@ import { AIEngine } from './engines/AIEngine';
 import { ArmyAI } from './engines/ArmyAI';
 import { EventEngine } from './engines/EventEngine';
 import { RebellionEngine } from './engines/RebellionEngine';
-import { TechEngine } from './engines/TechEngine';
+import { EraEngine } from './engines/EraEngine';
+import { TechnologyEngine, type ProvinceTransferEvent } from './technology/TechnologyEngine';
 import { GovernmentEngine } from './engines/GovernmentEngine';
 import { StatsEngine } from './engines/StatsEngine';
 
@@ -30,7 +31,9 @@ export interface SimEvents {
   provinceChanged: { province: number };
   countryChanged: { country: number };
   countryCreated: { country: number };
-  countryDestroyed: { country: number };
+  countryDestroyed: { country: number; by: number };
+  provinceTransferred: ProvinceTransferEvent;
+  capitalOccupied: { province: number; by: number; owner: number };
   history: HistoryEntry;
   battleStarted: Battle;
   battleEnded: Battle;
@@ -62,7 +65,8 @@ export class Simulation {
   readonly armyAI: ArmyAI;
   readonly events: EventEngine;
   readonly rebellion: RebellionEngine;
-  readonly tech: TechEngine;
+  readonly eras: EraEngine;
+  readonly technology: TechnologyEngine;
   readonly government: GovernmentEngine;
   readonly stats: StatsEngine;
 
@@ -87,7 +91,8 @@ export class Simulation {
     this.armyAI = new ArmyAI(this);
     this.events = new EventEngine(this);
     this.rebellion = new RebellionEngine(this);
-    this.tech = new TechEngine(this);
+    this.eras = new EraEngine(this);
+    this.technology = new TechnologyEngine(this);
     this.government = new GovernmentEngine(this);
     this.stats = new StatsEngine(this);
     this.index.rebuild();
@@ -145,11 +150,13 @@ export class Simulation {
       this.wars.monthly();
       this.rebellion.monthly();
       this.events.monthly();
+      this.technology.monthly();
       this.bus.emit('month', s.day);
     }
     this.ai.daily(d);
     if (d.dayOfYear === 0) {
-      this.tech.yearly();
+      this.eras.yearly();
+      this.technology.yearly();
       this.government.yearly();
       this.provinces.yearly();
       this.diplomacy.yearly();

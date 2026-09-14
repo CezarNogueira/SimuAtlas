@@ -1,6 +1,8 @@
 // Trechos de interface reutilizados pelos paineis: links de entidades, secoes, status de exercitos.
 import { formatDate } from '../../core/calendar';
+import type { Technology } from '../../data/technologies';
 import type { Simulation } from '../../sim/Simulation';
+import { STATUS_LABELS, type TechStatus } from '../../sim/technology/TechnologyEngine';
 import type { Army, HistoryEntry, HistoryType, War } from '../../state/types';
 import { esc, flagInline, icon } from '../dom';
 
@@ -32,6 +34,8 @@ export const HISTORY_ICONS: Record<HistoryType, string> = {
   destroyed: 'skull',
   diplomacy: 'scroll',
   disaster: 'fire',
+  era: 'globe',
+  espionage: 'target',
 };
 
 export function cLink(sim: Simulation, id: number): string {
@@ -47,6 +51,23 @@ export function pLink(sim: Simulation, pid: number): string {
 
 export function warLink(w: War): string {
   return `<span class="lnk" data-war="${w.id}">${esc(w.name)}</span>`;
+}
+
+export function techLink(sim: Simulation, id: string): string {
+  const t = sim.technology.db.get(id);
+  return t ? `<span class="lnk" data-tech="${esc(id)}">${esc(t.nome)}</span>` : esc(id);
+}
+
+// Marcador de situacao: verde = dominada, amarelo = em desenvolvimento, vermelho = nao disponivel.
+export function techDot(status: TechStatus): string {
+  const cls = status === 'dominada' ? 'green' : status === 'desenvolvimento' ? 'yellow' : 'red';
+  return `<i class="tdot ${cls}" title="${STATUS_LABELS[status]}"></i>`;
+}
+
+// Situacao da tecnologia no mundo: descoberta, possivel mas ainda nao descoberta, ou antes da data historica.
+export function worldTechStatus(sim: Simulation, t: Technology): TechStatus {
+  if (sim.state.technologies[t.id]?.discovered) return 'dominada';
+  return t.anoDescoberta <= sim.year() ? 'desenvolvimento' : 'indisponivel';
 }
 
 export const dateOf = (sim: Simulation, day: number) => formatDate(day, sim.state.startYear);

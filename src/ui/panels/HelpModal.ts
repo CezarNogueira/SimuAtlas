@@ -30,7 +30,7 @@ export class HelpModal extends BasePanel {
       <span>${k('Espaço')}</span><span>Pausar / continuar</span>
       <span>${k('1')}–${k('7')}</span><span>Velocidade 1x, 2x, 5x, 10x, 25x, 50x, 100x</span>
       <span>${k('.')}</span><span>Avançar um dia (pausado)</span>
-      <span>${k('H')} ${k('G')} ${k('E')}</span><span>Histórico, guerras, estatísticas</span>
+      <span>${k('H')} ${k('G')} ${k('E')} ${k('T')}</span><span>Histórico, guerras, estatísticas, tecnologias</span>
       <span>${k('F')}</span><span>Centralizar a seleção</span>
       <span>${k('Ctrl')}+${k('S')}</span><span>Salvamento rápido</span>
       <span>${k('Esc')}</span><span>Fechar painel / menu</span>
@@ -44,6 +44,9 @@ export class HelpModal extends BasePanel {
       da guerra (paz branca ou vitória de um dos lados). Um estado ocupado aparece listrado com a cor do ocupante e, após
       dois anos de ocupação, passa a pertencer a ele; a nação que perde todo o território é anexada. Para voltar aos tratados
       automáticos, ative "Nações fazem as pazes sozinhas" nas configurações.</p>
+      <p><b>Eras e tecnologia</b>: a era vem do ano da simulação. Cada tecnologia só pode surgir na sua data histórica,
+      quando um país apto a descobre; depois ela é vendida, licenciada, importada, roubada, capturada na guerra ou
+      desenvolvida por outros. Veja tudo no painel de tecnologias (tecla T) e na aba Tecnologia de cada nação.</p>
       <p><b>População</b>: cada país cresce de 1% a 1,5% ao ano (taxa sorteada todo ano). Instabilidade, guerra, falta
       de terras, ocupação, destruição, epidemias e fome reduzem o crescimento; veja os freios no painel da nação.</p>
       <p><b>A guerra cobra seu preço</b>: tropas em campanha e armamentos custam fortunas e são pagos com dívida; a

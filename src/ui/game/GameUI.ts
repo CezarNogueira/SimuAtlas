@@ -22,6 +22,8 @@ import { ProvincePanel } from '../panels/ProvincePanel';
 import { SaveModal } from '../panels/SaveModal';
 import { SettingsModal } from '../panels/SettingsModal';
 import { StatsModal } from '../panels/StatsModal';
+import { TechnologiesPanel } from '../panels/TechnologiesPanel';
+import { TechPanel } from '../panels/TechPanel';
 import { WarPanel } from '../panels/WarPanel';
 import { WarsPanel } from '../panels/WarsPanel';
 import type { GameScreen } from './GameScreen';
@@ -33,7 +35,7 @@ export interface UIPrefs {
 }
 
 export type ModalKind = 'stats' | 'settings' | 'save' | 'load' | 'menu' | 'help';
-export type LeftKind = 'history' | 'wars';
+export type LeftKind = 'history' | 'wars' | 'techs';
 
 const PREFS_KEY = 'atlas-vivo:prefs';
 const RENDER_KEY = 'atlas-vivo:render';
@@ -92,6 +94,7 @@ export class GameUI {
       on(this.layer, 'click', '[data-army]', (t) => this.selectArmy(num(t, 'army'), true)),
       on(this.layer, 'click', '[data-battle]', (t) => this.openBattle(num(t, 'battle'), true)),
       on(this.layer, 'click', '[data-war]', (t) => this.openWar(num(t, 'war'))),
+      on(this.layer, 'click', '[data-tech]', (t) => this.openTech(t.dataset.tech ?? '')),
       screen.sim.bus.on('history', (e) => this.onHistory(e)),
     );
   }
@@ -181,6 +184,12 @@ export class GameUI {
     this.setRight(new WarPanel(this, id));
   }
 
+  openTech(id: string): void {
+    if (!this.sim.technology.db.get(id)) return;
+    if (this.right instanceof TechPanel && this.right.techId === id) return;
+    this.setRight(new TechPanel(this, id));
+  }
+
   closeRight(): void {
     this.setRight(null);
     this.renderer.selectedCountry = -1;
@@ -194,7 +203,7 @@ export class GameUI {
     this.left = null;
     this.leftKind = null;
     if (same) return;
-    this.left = kind === 'history' ? new HistoryPanel(this) : new WarsPanel(this);
+    this.left = kind === 'history' ? new HistoryPanel(this) : kind === 'techs' ? new TechnologiesPanel(this) : new WarsPanel(this);
     this.leftKind = kind;
     this.layer.appendChild(this.left.node);
     this.left.update();

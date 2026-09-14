@@ -5,7 +5,6 @@
 // (estabilidade, guerra, fome, escassez e inflacao descontrolada) e de cada estado (terra disponivel, ocupacao,
 // destruicao e epidemias). A medicina reduz o peso das epidemias e da fome.
 import { clamp } from '../../core/math';
-import { techEffects } from '../../data/techs';
 import type { Country } from '../../state/types';
 import type { Simulation } from '../Simulation';
 
@@ -40,8 +39,11 @@ export class PopulationEngine {
   capacity(pid: number): number {
     const sim = this.sim;
     const ps = sim.state.provinces[pid];
-    const tech = ps.owner >= 0 ? sim.country(ps.owner).tech : sim.era.tech;
-    return ps.capacity * Math.pow(1.13, Math.max(-3, tech - sim.era.tech)) * (0.8 + ps.development / 50);
+    const owner = ps.owner >= 0 ? sim.country(ps.owner) : null;
+    const tech = owner ? owner.tech : sim.state.techBaseline;
+    // Tecnicas agricolas (arados, rotacao de culturas, fertilizantes, Revolucao Verde) ampliam o sustento da terra.
+    const agriculture = owner ? sim.technology.fx(owner).agriculture : 0;
+    return ps.capacity * Math.pow(1.13, Math.max(-3, tech - sim.state.techBaseline)) * (0.8 + ps.development / 50) * (1 + agriculture * 0.5);
   }
 
   // Sorteia a taxa natural do ano (na criacao do pais e a cada virada de ano).
@@ -52,7 +54,7 @@ export class PopulationEngine {
 
   private national(c: Country): NationalGrowth {
     const sim = this.sim;
-    const resilience = 1 - Math.min(0.7, techEffects(c.tech).growth * 5);
+    const resilience = 1 - Math.min(0.7, sim.technology.fx(c).medicine * 5);
     let mods = 0;
     for (const m of c.modifiers) if (m.growth && m.until > sim.day) mods += m.growth < 0 ? m.growth * resilience : m.growth;
     return {

@@ -52,6 +52,21 @@ function integrity(): string[] {
     if (!s.countries[a.owner]?.alive) problems.push(`exército ${a.id} de país extinto`);
     if (!Number.isFinite(a.infantry + a.cavalry + a.artillery)) problems.push(`exército ${a.id} com tropas inválidas`);
   }
+  // Nenhuma tecnologia pode existir antes da sua data historica.
+  const year = sim.year();
+  for (const c of s.countries) {
+    if (!c.alive) continue;
+    for (const id in c.techs) {
+      const t = sim.technology.db.get(id);
+      const h = c.techs[id];
+      if (!t) problems.push(`${c.name} possui tecnologia inexistente ${id}`);
+      else if ((h.stage === 'conhecimento' || h.stage === 'producao') && t.anoDescoberta > year) problems.push(`${c.name} domina ${t.nome} (${t.anoDescoberta}) em ${year}`);
+    }
+  }
+  for (const t of sim.technology.db.all) {
+    const rec = s.technologies[t.id];
+    if (rec.discovered && !rec.preStart && rec.discoveryYear < t.anoDescoberta) problems.push(`${t.nome} descoberta em ${rec.discoveryYear}, antes de ${t.anoDescoberta}`);
+  }
   return problems.slice(0, 10);
 }
 
@@ -106,6 +121,31 @@ console.log(
     `avisos: escassez ${hardships.escassez}, dívida de guerra ${hardships.divida}, moratórias ${hardships.moratoria}`,
 );
 const tech = sim.countries.nations().reduce((acc, c) => Math.max(acc, c.tech), 0);
-console.log(`Tecnologia máxima: ${tech.toFixed(1)}`);
+const db = sim.technology.db;
+const records = sim.state.technologies;
+const reached = db.countUntil(sim.year());
+const discovered = db.all.filter((t) => records[t.id].discovered);
+const inSim = discovered.filter((t) => !records[t.id].preStart);
+const delays = inSim.map((t) => records[t.id].discoveryYear - Math.max(t.anoDescoberta, sim.state.startYear));
+const pending = db.all.slice(0, reached).filter((t) => !records[t.id].discovered);
+console.log(`\nEra: ${sim.eras.current().name} | nível tecnológico máximo ${tech.toFixed(1)}`);
+console.log(`Tecnologias: ${discovered.length} descobertas (${inSim.length} durante a simulação) de ${reached} com data alcançada; ${pending.length} por descobrir${pending.length ? ` (mais antiga: ${pending[0].nome}, ${pending[0].anoDescoberta})` : ''}`);
+if (delays.length) console.log(`  atraso em relação à data histórica: médio ${(delays.reduce((a, b) => a + b, 0) / delays.length).toFixed(1)} anos, máximo ${Math.max(...delays)} anos`);
+const sources = new Map<string, number>();
+let failedSpies = 0;
+for (const t of db.all) {
+  for (const e of records[t.id].log) {
+    if (e.type === 'espionagem_fracassada') failedSpies++;
+    else if (e.source && e.type !== 'pre_existente') sources.set(e.source, (sources.get(e.source) ?? 0) + 1);
+  }
+}
+console.log(`  aquisições por forma: ${JSON.stringify(Object.fromEntries([...sources.entries()].sort((a, b) => b[1] - a[1])))} | espionagens fracassadas: ${failedSpies} | contratos ativos: ${sim.state.techContracts.length}`);
+const leaders = [...sim.countries.nations()].sort((a, b) => b.tech - a.tech).slice(0, 5);
+console.log(`  mais avançados: ${leaders.map((c) => `${c.name} ${c.tech.toFixed(1)} (capacidade ${c.science.capacity.toFixed(2)}, educação ${Math.round(c.science.education * 100)}%, ${c.science.universities} universidades)`).join(' | ')}`);
+for (const t of [...inSim].sort((a, b) => b.valorEstrategico - a.valorEstrategico || b.anoDescoberta - a.anoDescoberta).slice(0, 3)) {
+  const rec = records[t.id];
+  console.log(`  ${t.nome} (data histórica ${t.anoDescoberta}): descoberta em ${rec.discoveryYear} por ${sim.country(rec.discoverer).name}; ${rec.holders} dominam, ${rec.producers} produzem, ${rec.importers} importam`);
+  for (const e of rec.log.slice(0, 8)) console.log(`    ${sim.year(e.day)} ${sim.technology.history.describe(t, e)}`);
+}
 console.log('\nÚltimos acontecimentos importantes:');
 for (const e of sim.history.recent(25, 2).reverse()) console.log(`  ${sim.year(e.day)} - ${e.text}`);

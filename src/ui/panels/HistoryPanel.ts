@@ -13,7 +13,8 @@ const CATEGORIES: { id: string; label: string; icon: string; types: HistoryType[
   { id: 'diplomacy', label: 'Diplomacia', icon: 'scroll', types: ['alliance', 'alliance_broken', 'treaty', 'diplomacy'] },
   { id: 'politics', label: 'Política', icon: 'crown', types: ['government', 'ruler', 'coup', 'revolution', 'civil_war'] },
   { id: 'nations', label: 'Nações', icon: 'globe', types: ['rebellion', 'independence', 'founded', 'destroyed', 'collapse', 'start'] },
-  { id: 'world', label: 'Economia e eventos', icon: 'coins', types: ['economy', 'event', 'disaster', 'tech'] },
+  { id: 'world', label: 'Economia e eventos', icon: 'coins', types: ['economy', 'event', 'disaster'] },
+  { id: 'tech', label: 'Tecnologia', icon: 'gear', types: ['tech', 'espionage', 'era'] },
 ];
 
 const LIMIT = 300;

@@ -1,7 +1,7 @@
 // Tela de novo jogo: escolha entre os 6 mapas, era inicial, semente e parametros da simulacao.
 import type { App } from '../../app/App';
 import { fmtInt } from '../../core/format';
-import { ERAS } from '../../data/eras';
+import { ERAS, eraOfYear } from '../../data/eras';
 import { el, esc, icon } from '../dom';
 
 const MAP_ORDER = ['world', 'americas', 'europe', 'asia-oceania', 'eurasia', 'africa'];
@@ -33,10 +33,11 @@ export class NewGameScreen {
                 <div class="meta"><span>${icon('flag', 16)} ${fmtInt(m.nations)} nações</span><span>${icon('pin', 16)} ${fmtInt(m.provinces)} estados</span></div>
               </button>`).join('')}
           </div>
-          <div class="section-title">${icon('book', 16)} Era inicial</div>
+          <div class="section-title">${icon('book', 16)} Ano inicial</div>
           <div class="era-list">
-            ${ERAS.map((e) => `<button class="px-btn${e.id === this.eraId ? ' on' : ''}" data-era="${e.id}">${e.year} — ${esc(e.name)}<small>${esc(e.description)}</small></button>`).join('')}
+            ${ERAS.map((e) => `<button class="px-btn${e.id === this.eraId ? ' on' : ''}" data-era="${e.id}">${e.year} — ${esc(e.name)} · ${esc(eraOfYear(e.year).name)}<small>${esc(e.description)}</small></button>`).join('')}
           </div>
+          <div class="hint">A era é definida pelo ano da simulação. As tecnologias surgem uma a uma, nas suas datas históricas, e cada país precisa descobri-las, comprá-las, licenciá-las, roubá-las ou desenvolvê-las.</div>
           <div class="section-title">${icon('gear', 16)} Parâmetros</div>
           <div class="opt-grid">
             <label>Semente do mundo

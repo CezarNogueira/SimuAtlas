@@ -8,7 +8,7 @@ import type { ReligionId } from '../../data/religions';
 import { articleFor, deName, inName, toName, type Article } from '../../data/language';
 import { pickDistinctColor } from '../../data/palette';
 import type { RGB } from '../../data/terrain';
-import { techEffects } from '../../data/techs';
+import { emptyScience } from '../technology/TechnologyResearchEngine';
 import type { Country, CountryKind, FlagDesign, RebelInfo } from '../../state/types';
 import { newFlag } from '../flags';
 import { newLeader } from '../names';
@@ -101,7 +101,7 @@ export class CountryEngine {
       }
       for (const c of s.countries) {
         if (!c.alive) continue;
-        this.strengthCache[c.id] = this.strengthCache[c.id] * (1 + techEffects(c.tech).military) + c.manpower * 0.15;
+        this.strengthCache[c.id] = this.strengthCache[c.id] * (1 + this.sim.technology.fx(c).military) + c.manpower * 0.15;
       }
     }
     return this.strengthCache[id] ?? 0;
@@ -209,7 +209,7 @@ export class CountryEngine {
         : `${c.name} deixou de existir.`;
       sim.history.add('destroyed', text, { countries: by >= 0 ? [id, by] : [id], importance: 3 });
     }
-    sim.bus.emit('countryDestroyed', { country: id });
+    sim.bus.emit('countryDestroyed', { country: id, by });
   }
 
   // Cria (ou revive) um pais a partir de provincias e de um pais de origem.
@@ -281,11 +281,13 @@ export class CountryEngine {
       happiness: 55,
       warExhaustion: 0,
       aggressiveExpansion: 0,
-      tech: parent ? parent.tech * rng.float(0.94, 1.0) : sim.era.tech,
+      tech: parent ? parent.tech : sim.era.tech,
       manpower: 0,
       maxManpower: 0,
       navy: 0,
       airForce: 0,
+      techs: {},
+      science: emptyScience(),
       provinceCount: 0,
       area: 0,
       armySize: 0,
@@ -311,6 +313,9 @@ export class CountryEngine {
     for (const p of opts.provinces) sim.provinces.transfer(p, id, opts.kind === 'rebel' ? 'revolt' : 'independence');
     if (capital >= 0) c.capital = capital;
     this.recompute(id);
+    // O pais novo leva o conhecimento do pais de origem (universidades, cientistas, fabricas).
+    if (parent) sim.technology.inherit(c, parent);
+    else sim.technology.effects.refresh(c);
     if (parent && opts.provinces.length) {
       const share = parent.population > 0 ? c.population / (parent.population + c.population) : 0.1;
       const moved = parent.treasury * share * 0.5;
@@ -337,9 +342,13 @@ export class CountryEngine {
     c.overlord = -1;
     c.rebel = null;
     c.ruler = newLeader(sim.rng, c.culture, sim.day, sim.nextId('person'), c.regnalCount);
+    const donor = provinces.length ? sim.state.provinces[provinces[0]].owner : -1;
     for (const p of provinces) sim.provinces.transfer(p, id, 'restore');
     if (!provinces.includes(c.capital)) c.capital = provinces[0];
     this.recompute(id);
+    // Restaurado, o pais recupera o conhecimento a partir de quem governava seus estados.
+    if (donor >= 0 && donor !== id && sim.country(donor)) sim.technology.inherit(c, sim.country(donor));
+    else sim.technology.effects.refresh(c);
     c.manpower = c.maxManpower * 0.3;
     sim.bus.emit('countryCreated', { country: id });
     return c;
@@ -379,7 +388,7 @@ export class CountryEngine {
       const happyTarget = clamp(52 + growthTerm - c.unemployment * 110 - Math.min(18, c.inflation * 60) - c.warExhaustion * 0.3 + (c.taxRate < sim.era.taxRate ? 4 : -4), 0, 100);
       c.happiness = clamp(c.happiness + (happyTarget - c.happiness) * 0.1, 0, 100);
 
-      const corrTarget = clamp(gov.corruption + owned.length / 300 - c.ruler.skills.adm * 0.01 + (c.stability < 30 ? 0.06 : 0), 0.01, 0.9);
+      const corrTarget = clamp(gov.corruption + owned.length / 300 - c.ruler.skills.adm * 0.01 + (c.stability < 30 ? 0.06 : 0) - sim.technology.fx(c).administration * 0.25, 0.01, 0.9);
       c.corruption = clamp(c.corruption + (corrTarget - c.corruption) * 0.03, 0, 1);
 
       c.prestige = clamp(c.prestige + (8 - c.prestige) * 0.01, 0, 100);

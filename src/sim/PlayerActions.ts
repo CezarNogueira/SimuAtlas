@@ -181,9 +181,11 @@ export class PlayerActions {
     return ok('Ouro concedido.');
   }
 
+  // Concede a tecnologia mais antiga ja descoberta no mundo que a nacao ainda nao domina (nunca antes da data historica).
   boostTech(countryId: number): ActionResult {
-    this.sim.country(countryId).tech += 1;
-    return ok('Tecnologia avançou um nível.');
+    const c = this.sim.country(countryId);
+    const t = this.sim.technology.grantByObserver(c);
+    return t ? ok(`${c.name} recebeu a tecnologia ${t.nome}.`) : fail('Não há tecnologia já descoberta no mundo que esta nação ainda não domine.');
   }
 
   rename(countryId: number, name: string): ActionResult {

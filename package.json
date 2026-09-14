@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "sim": "tsx scripts/sim-headless.ts",
+    "techs": "tsx scripts/validate-techs.ts",
     "e2e": "node scripts/e2e.mjs"
   },
   "devDependencies": {

@@ -3,7 +3,8 @@
 import { Rng } from '../core/rng';
 import { clamp } from '../core/math';
 import { countryMeta, FRIENDSHIPS, MODERN_GOVERNMENT, RIVALRIES } from '../data/countryMeta';
-import { eraById, type EraPreset } from '../data/eras';
+import { eraById, eraOfYear, type EraPreset } from '../data/eras';
+import { incomeLevel } from '../data/income';
 import { GOVERNMENTS, type GovernmentId } from '../data/governments';
 import { articleFor } from '../data/language';
 import { pickDistinctColor } from '../data/palette';
@@ -15,9 +16,11 @@ import { DEFAULT_SETTINGS, type Country, type GameState, type SimSettings } from
 import { newFlag } from './flags';
 import { newLeader } from './names';
 import { Simulation } from './Simulation';
+import { emptyScience } from './technology/TechnologyResearchEngine';
 
 // 2: mapas divididos em estados reais (saves da versao 1 usavam provincias geradas por cidades).
-export const SAVE_VERSION = 2;
+// 3: eras historicas por ano e tecnologias com data, descobridor, propriedade, mercado e difusao.
+export const SAVE_VERSION = 3;
 
 export interface NewGameOptions {
   eraId: string;
@@ -25,20 +28,11 @@ export interface NewGameOptions {
   settings?: Partial<SimSettings>;
 }
 
-function incomeLevel(income: string): number {
-  if (!income) return 1;
-  if (income.startsWith('1')) return 4;
-  if (income.startsWith('2')) return 3;
-  if (income.startsWith('3')) return 2;
-  if (income.startsWith('4')) return 1;
-  return 0;
-}
-
 type NationSize = 'large' | 'medium' | 'small';
 
 // Porte pela fatia de area e populacao do mapa: so potencias realmente grandes comecam como imperios.
 function chooseGovernment(rng: Rng, era: EraPreset, code: string, provinces: number, size: NationSize, religion: string, income: number): GovernmentId {
-  if (era.id === 'contemporary') {
+  if (era.year >= 2000) {
     const modern = MODERN_GOVERNMENT[code];
     if (modern) return modern;
     return rng.weighted<GovernmentId>(['democracy', 'republic', 'dictatorship'], (g) => (g === 'democracy' ? 1 + income : g === 'republic' ? 2 : 1.5 - income * 0.3)) ?? 'republic';
@@ -115,9 +109,12 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
       world: { years: [], pop: [], gdp: [], army: [], provinces: [], countries: [], wars: [] },
       countries: {},
       snapshots: [],
-      techFirsts: {},
     },
-    nextId: { army: 1, war: 1, battle: 1, treaty: 1, history: 1, person: 1 },
+    era: eraOfYear(era.year).id,
+    techBaseline: era.tech,
+    technologies: {},
+    techContracts: [],
+    nextId: { army: 1, war: 1, battle: 1, treaty: 1, history: 1, person: 1, contract: 1 },
   };
 
   // Adjacencia entre nacoes (para cores distintas).
@@ -159,10 +156,10 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
       treasury: 0, debt: 0, inflation: 0.02, unemployment: 0.06, taxRate: era.taxRate, gdp: 0, gdpLastYear: 0, growth: 0.01,
       income: 0, expenses: 0, tradeIncome: 0, militaryBudget: PERSONALITIES[personality].militaryBudget, population: 0,
       stability: rng.int(50, 72), corruption: GOVERNMENTS[government].corruption, prestige: clamp(10 + (size === 'large' ? 22 : size === 'medium' ? 10 : 0) + provinces * 0.3, 10, 50),
-      happiness: 55, warExhaustion: 0, aggressiveExpansion: 0, tech: Math.max(0, era.tech + (income - 2) * 0.35 + rng.float(-0.25, 0.25)),
+      happiness: 55, warExhaustion: 0, aggressiveExpansion: 0, tech: era.tech,
       manpower: 0, maxManpower: 0, navy: 0, airForce: 0, provinceCount: 0, area: 0, armySize: 0, traits: [], modifiers: [],
       battlesWon: 0, battlesLost: 0, warsWon: 0, warsLost: 0, provincesConquered: 0, provincesLost: 0, recentChanges: [],
-      pastWars: [], ai: true, overlord: -1, rebel: null, decisionDay: rng.int(5, 40), lastWarDay: -3650,
+      pastWars: [], ai: true, overlord: -1, rebel: null, decisionDay: rng.int(5, 40), lastWarDay: -3650, techs: {}, science: emptyScience(),
     };
     if (era.tech >= 11) c.ideology = rng.pick(['liberalism', 'conservatism', 'nationalism']);
     else if (era.tech >= 5) c.ideology = rng.pick(['traditionalism', 'absolutism', 'mercantilism']);
@@ -206,6 +203,9 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
 
   const sim = new Simulation(map, state);
   sim.countries.recomputeAll();
+  // Eras e tecnologias: conhecimento existente antes do ano inicial, base cientifica e nivel tecnologico de cada pais.
+  sim.eras.initialize();
+  sim.technology.initializeWorld();
   for (const c of state.countries) {
     sim.population.drawGrowth(c);
     c.manpower = c.maxManpower * 0.6;
@@ -253,7 +253,7 @@ export function createWorld(map: MapData, opts: NewGameOptions): Simulation {
     if (ia !== undefined && ib !== undefined) sim.diplomacy.addRelation(ia, ib, v);
   }
 
-  sim.history.add('start', `Início da simulação: ${state.countries.length} nações disputam o ${map.name} no ano de ${era.year} (${era.name}).`, { importance: 3 });
+  sim.history.add('start', `Início da simulação: ${state.countries.length} nações disputam o ${map.name} no ano de ${era.year} (${eraOfYear(era.year).name} · ${era.name}).`, { importance: 3 });
   // Aquecimento diplomatico: alguns meses de diplomacia antes do inicio (aliancas, pactos, garantias).
   for (let round = 0; round < 6; round++) {
     for (const c of state.countries) if (c.alive) sim.ai.considerDiplomacy(c);

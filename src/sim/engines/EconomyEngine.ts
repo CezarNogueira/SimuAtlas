@@ -7,7 +7,6 @@ import { GOVERNMENTS } from '../../data/governments';
 import { IDEOLOGIES } from '../../data/ideologies';
 import { resourceValue } from '../../data/resources';
 import { terrainInfo } from '../../data/terrain';
-import { techEffects } from '../../data/techs';
 import type { Country } from '../../state/types';
 import type { Simulation } from '../Simulation';
 
@@ -33,7 +32,7 @@ export class EconomyEngine {
   constructor(private sim: Simulation) {}
 
   gdpPerCapita(c: Country): number {
-    return this.sim.era.gdpPerCapita * Math.pow(1.09, c.tech - this.sim.era.tech);
+    return this.sim.era.gdpPerCapita * Math.pow(1.09, c.tech - this.sim.state.techBaseline);
   }
 
   soldierMonthlyCost(c: Country): number {
@@ -69,10 +68,10 @@ export class EconomyEngine {
     const sim = this.sim;
     const ps = sim.state.provinces[pid];
     const mp = sim.map.provinces[pid];
-    const fx = techEffects(c.tech);
+    const fx = sim.technology.fx(c);
     let mult =
-      terrainInfo(mp.terrain).production * resourceValue(ps.resource, c.tech) * (0.45 + ps.development * 0.055) *
-      (1 + fx.economy) * (mp.coast > 0 ? 1.08 : 1) * (mp.river > 0 ? 1.05 : 1);
+      terrainInfo(mp.terrain).production * resourceValue(ps.resource, sim.technology.resourceUnlocked(c, ps.resource)) * (0.45 + ps.development * 0.055) *
+      (1 + fx.economy) * (1 + fx.industry * clamp(ps.development / 12, 0.2, 1.5)) * (mp.coast > 0 ? 1.08 : 1) * (mp.river > 0 ? 1.05 : 1);
     if (!intact) {
       // Fabricas, estradas, pontes e plantacoes destruidas param a producao.
       mult *= 1 - ps.devastation * DEVASTATION_OUTPUT_LOSS;
@@ -153,6 +152,7 @@ export class EconomyEngine {
       }
       const gov = GOVERNMENTS[c.government];
       const ideology = IDEOLOGIES[c.ideology];
+      const fx = sim.technology.fx(c);
       const modEconomy = c.modifiers.reduce((acc, m) => acc * (1 + (m.economy ?? 0)), 1);
       const stabF = 0.7 + c.stability / 333;
       // Inflacao alta desorganiza a economia (escassez, especulacao, poupanca destruida).
@@ -166,14 +166,15 @@ export class EconomyEngine {
       let sanctions = 0;
       for (const t of s.treaties) if (t.active && t.type === 'sanction' && t.target === c.id) sanctions++;
       const coastShare = c.provinceCount > 0 ? sim.index.ownedBy[c.id].filter((p) => sim.map.coastal[p]).length / c.provinceCount : 0;
-      c.tradeIncome = gdpMonthly * (0.01 + 0.012 * Math.min(6, tradePartners) * ideology.trade + coastShare * 0.02) * Math.max(0.4, 1 - 0.12 * sanctions);
-      const taxes = gdpMonthly * c.taxRate * gov.tax * (1 - c.corruption * 0.7);
+      c.tradeIncome = gdpMonthly * (0.01 + 0.012 * Math.min(6, tradePartners) * ideology.trade + coastShare * 0.02) * Math.max(0.4, 1 - 0.12 * sanctions) * (1 + fx.transport * 0.5);
+      const taxes = gdpMonthly * c.taxRate * gov.tax * (1 - c.corruption * 0.7) * (1 + fx.administration * 0.3);
       const atWar = sim.index.isAtWar(c.id);
       const adminCost = gdpMonthly * 0.03;
       const debtRatio = c.debt / Math.max(1, c.gdp);
       const interest = (c.debt * (0.04 + Math.min(0.12, debtRatio * 0.05))) / 12;
       c.income = taxes + c.tradeIncome + loot[c.id];
-      c.expenses = this.militaryCost(c) + adminCost + interest;
+      // Pesquisa e adaptacao de tecnologias a producao (fabricas, laboratorios, formacao de engenheiros).
+      c.expenses = this.militaryCost(c) + adminCost + interest + c.science.spending;
       const balance = c.income - c.expenses;
       let unpaid = 0;
       if (atWar && balance < 0) {

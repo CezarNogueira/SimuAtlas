@@ -333,6 +333,13 @@ input[type='range'].px-range { width: 100%; accent-color: var(--red); }
 .mini-table tr.link { cursor: pointer; }
 .mini-table tr.link:hover { background: var(--paper-2); }
 .hint-box { font-size: 12px; color: var(--ink-soft); border: 2px dashed var(--paper-dark); padding: 6px; margin: 6px 0; line-height: 1.35; }
+.tdot { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--edge); flex: none; vertical-align: middle; margin-right: 2px; }
+.tdot.green { background: #5aa33f; }
+.tdot.yellow { background: #e0b12e; }
+.tdot.red { background: #c2452f; }
+.tech-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-bottom: 6px; }
+.tech-filters .px-select, .tech-filters .px-input { width: 100%; min-width: 0; }
+.tech-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; margin: 2px 0 4px; }
 .skills { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; align-items: center; font-size: 13px; }
 .new-events { position: sticky; top: 0; z-index: 2; width: 100%; margin-bottom: 4px; }
 .army-title { display: flex; gap: 8px; align-items: center; }

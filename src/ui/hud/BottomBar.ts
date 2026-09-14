@@ -24,6 +24,7 @@ export class BottomBar {
       <div class="group">
         <button class="px-btn" data-act="history" title="Histórico (H)">${icon('book', 18)} Histórico</button>
         <button class="px-btn" data-act="wars" title="Guerras (G)">${icon('swords', 18)} Guerras</button>
+        <button class="px-btn" data-act="techs" title="Tecnologias (T)">${icon('gear', 18)} Tecnologia</button>
         <button class="px-btn" data-act="stats" title="Estatísticas (E)">${icon('chart', 18)} Estatísticas</button>
         <button class="px-btn" data-act="settings">${icon('gear', 18)} Configurações</button>
         <button class="px-btn" data-act="save" title="Salvar (Ctrl+S)">${icon('save', 18)} Salvar</button>
@@ -48,6 +49,7 @@ export class BottomBar {
         }
         case 'history': ui.toggleLeft('history'); break;
         case 'wars': ui.toggleLeft('wars'); break;
+        case 'techs': ui.toggleLeft('techs'); break;
         case 'stats': ui.openModal('stats'); break;
         case 'settings': ui.openModal('settings'); break;
         case 'save': ui.openModal('save'); break;

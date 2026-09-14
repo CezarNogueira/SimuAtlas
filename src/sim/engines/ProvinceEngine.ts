@@ -60,6 +60,7 @@ export class ProvinceEngine {
     p.occupiedSince = controller === p.owner ? -1 : this.sim.day;
     this.sim.bus.emit('provinceChanged', { province: id });
     if (controller !== p.owner && p.owner >= 0 && this.sim.country(p.owner).capital === id) {
+      this.sim.bus.emit('capitalOccupied', { province: id, by: controller, owner: p.owner });
       this.sim.wars.onCapitalOccupied(id, controller, p.owner);
     } else if (controller === p.owner && previous !== p.owner) {
       p.unrest = Math.max(0, p.unrest - 5);
@@ -75,6 +76,7 @@ export class ProvinceEngine {
     const sim = this.sim;
     const p = this.get(id);
     const from = p.owner;
+    const wasCapital = from >= 0 && sim.country(from).capital === id;
     if (from === to) {
       if (p.controller !== to) this.setController(id, to);
       return;
@@ -111,6 +113,7 @@ export class ProvinceEngine {
       if (source.capital === id) sim.countries.relocateCapital(from, true);
     }
     sim.bus.emit('provinceChanged', { province: id });
+    sim.bus.emit('provinceTransferred', { province: id, from, to, reason, wasCapital });
     if (from >= 0 && sim.index.ownedBy[from].length === 0 && sim.country(from).kind === 'nation') {
       sim.countries.destroy(from, to);
     }
@@ -142,7 +145,7 @@ export class ProvinceEngine {
       if (p.devastation > 0.5) p.development = Math.max(1, p.development - 0.01);
       if (p.epidemic > 0) p.epidemic = Math.max(0, p.epidemic - 30);
       if (p.controller === p.owner && c.stability > 30 && p.devastation < 0.3) {
-        p.development = Math.min(30, p.development + 0.003 * (0.5 + c.stability / 100) * (1 + c.tech / 25));
+        p.development = Math.min(30, p.development + 0.003 * (0.5 + c.stability / 100) * (1 + c.tech / 25) * (1 + this.sim.technology.fx(c).infrastructure));
       }
     }
   }

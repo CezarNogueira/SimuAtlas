@@ -53,9 +53,54 @@ estado vizinho. Com `STATES_REPORT=<pasta>`, o `build-maps` grava a lista de est
 | Velocidade 1x, 2x, 5x, 10x, 25x, 50x, 100x | `1` … `7` |
 | Avançar um dia (pausado) | `.` |
 | Histórico / Guerras / Estatísticas | `H` / `G` / `E` |
+| Tecnologias | `T` |
 | Centralizar na seleção | `F` |
 | Fechar painel / menu do jogo | `Esc` |
 | Salvamento rápido | `Ctrl+S` |
+
+## Eras e tecnologia
+
+A era é definida pelo ano da simulação: **Era Medieval** (476–1453), **Era Moderna** (1454–1759), **Primeira Revolução**
+(1760–1850), **Segunda Revolução** (1851–1969), **Terceira Revolução** (1970–2010) e **Quarta Revolução** (2011 em
+diante). A mudança de era é registrada no histórico, mas não libera tecnologia nenhuma: ela só dá o contexto histórico.
+
+O banco de tecnologias (`src/data/technologies/`) reúne 327 descobertas e invenções, da irrigação e da roda à IA
+generativa, cada uma com data histórica, categoria, origem real, custo base, complexidade, recursos e infraestrutura
+necessários, efeitos, dependências, tecnologias desbloqueadas, valor estratégico, raridade e tempos para dominar e
+produzir. `npm run techs` valida datas, dependências (sempre anteriores e sem ciclos), eras, categorias e recursos.
+
+Cada tecnologia tem trajetória própria:
+
+1. **Descoberta.** Nenhuma tecnologia existe antes da sua data. Os países pesquisam com antecedência e, quando o ano
+   chega, são elegíveis os que dominam as dependências, têm a infraestrutura e concluíram a pesquisa preparatória. O
+   descobridor é sorteado com peso pela capacidade científica. Se ninguém estiver apto, a descoberta espera.
+2. **Propriedade.** O descobridor produz e detém o monopólio. Cada produtor escolhe uma política: vender a tecnologia,
+   licenciá-la com royalties, só exportar produtos ou manter segredo (mais comum em tecnologias militares e
+   estratégicas; a idade e a difusão abrem o mercado).
+3. **Mercado.** O preço é calculado por fórmula (complexidade, raridade, valor estratégico, idade, dificuldade de
+   produção, oferta, demanda, difusão, monopólio, alternativas, recursos, infraestrutura, riqueza do vendedor, poder
+   econômico do comprador e relações diplomáticas) e convertido para a moeda da época. O painel mostra a composição
+   do custo em cada era: ouro e trabalhadores na Idade Média, capital e máquinas na era industrial, P&D e profissionais
+   na era digital.
+4. **Aquisição.** Compra, tratado, licenciamento, investimento estrangeiro, importação de produtos prontos,
+   transferência científica entre aliados, intercâmbio, universidades, migração de cientistas, espionagem e roubo,
+   captura de cientistas e fábricas na guerra, conquista e anexação, acordos pós-guerra, pesquisa própria e
+   desenvolvimento independente. Antes de 1850, comércio e espionagem só alcançam vizinhos, parceiros e aliados.
+5. **Produção.** Conhecer não é produzir: o país precisa de fábricas, matérias-primas (próprias, de parceiros ou do
+   mercado mundial), mão de obra especializada, infraestrutura e capital, e passa por um período de adaptação.
+6. **Difusão e obsolescência.** O conhecimento se espalha devagar na Idade Média e rapidamente no século XXI. Uma
+   tecnologia fica obsoleta quando a que a substitui já é produzida por boa parte do mundo.
+
+A capacidade de pesquisa de cada país depende de educação, universidades, cientistas, tamanho, riqueza,
+estabilidade, desenvolvimento, industrialização e das tecnologias que já domina. Os efeitos são reais: produtividade,
+indústria, agricultura, infraestrutura, administração, comércio, medicina, educação, pesquisa, poder militar,
+defesa, cercos, marinha e força aérea. O nível tecnológico de cada país é calculado a partir do que ele domina.
+
+Cenários iniciais: 476, 1444, 1523, 1750, 1836, 1936, 2000 e 2015. O conhecimento anterior ao ano inicial é distribuído
+pela tradição científica de cada cultura na época e, nos séculos recentes, pela renda do país. O painel de
+tecnologias (tecla `T`) mostra o banco por era e categoria. O painel de cada tecnologia mostra descobridor,
+proprietários, quem domina e quem importa, preço, difusão, complexidade e toda a trajetória. A aba Tecnologia da nação
+reúne pesquisas, adaptações, contratos, monopólios e aquisições.
 
 ## População
 
@@ -132,7 +177,8 @@ símbolos de montanhas, florestas e dunas, fronteiras desenhadas e rótulos em f
 
 ```bash
 npm run typecheck
-npm run sim -- europe 100 renaissance 12345   # 100 anos sem interface + verificação de integridade
+npm run techs                                 # valida o banco de tecnologias
+npm run sim -- europe 100 renaissance 12345   # 100 anos sem interface + integridade e relatório tecnológico
 npm run e2e -- saida europe                   # Chrome headless com o servidor de dev rodando
 ```
 

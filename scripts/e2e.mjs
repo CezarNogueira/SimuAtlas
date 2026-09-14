@@ -93,6 +93,10 @@ try {
     await sleep(700);
     await shot('06-tab-territorio');
   }
+  if (await clickIf('[data-tab="tecnologia"]')) {
+    await sleep(700);
+    await shot('06b-tab-tecnologia');
+  }
   await page.keyboard.press('Escape');
 
   await page.mouse.move(800, 450);
@@ -115,6 +119,22 @@ try {
     await page.keyboard.press('Escape');
   }
   await page.keyboard.press('g');
+  await sleep(300);
+
+  // Painel de tecnologias, detalhe de uma tecnologia e sua trajetoria.
+  await page.keyboard.press('t');
+  await sleep(900);
+  await shot('07c-tech-list');
+  if (await clickIf('.side.left .row.link[data-tech]')) {
+    await sleep(1000);
+    await shot('07d-tech-panel');
+    if (await clickIf('.side.right [data-tab="historico"]')) {
+      await sleep(600);
+      await shot('07e-tech-history');
+    }
+    await page.keyboard.press('Escape');
+  }
+  await page.keyboard.press('t');
   await sleep(300);
 
   await page.keyboard.press('e');

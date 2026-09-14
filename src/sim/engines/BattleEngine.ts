@@ -5,7 +5,6 @@ import { season } from '../../core/calendar';
 import { fmtInt } from '../../core/format';
 import { clamp } from '../../core/math';
 import { terrainInfo, type TerrainInfo } from '../../data/terrain';
-import { techEffects } from '../../data/techs';
 import type { Army, Battle, BattleSide } from '../../state/types';
 import { battleName } from '../names';
 import type { Simulation } from '../Simulation';
@@ -141,10 +140,10 @@ export class BattleEngine {
     let p = 0;
     for (const a of armies) {
       const c = this.sim.country(a.owner);
-      const fx = techEffects(c.tech);
+      const fx = this.sim.technology.fx(c);
       const g = this.sim.military.general(a);
       const skill = g ? (mode === 'attack' ? g.attack : g.defense) : 0;
-      const armor = c.tech >= 20 ? 1.2 : 1;
+      const armor = this.sim.technology.hasArmor(c) ? 1.2 : 1;
       const base = a.infantry + a.cavalry * 1.5 * t.cavalry * armor + a.artillery * 1.3;
       p += base * (1 + fx.military) * (0.35 + 0.65 * a.morale) * (1 + a.experience * 0.4) * (1 + skill * 0.05) * (0.6 + 0.4 * a.supply);
     }
@@ -187,8 +186,8 @@ export class BattleEngine {
     const climate = season(sim.day, lat) === 0 && Math.abs(lat) > 40 ? 0.85 : 1;
     const A = this.power(att, t, 'attack') * climate;
     const D = this.power(def, t, 'defense') * climate;
-    const defTech = Math.max(...def.map((a) => sim.country(a.owner).tech));
-    const defense = t.defense * (1 + b.fort * 0.12) * (1 + techEffects(defTech).defense) * (b.river ? 1.2 : 1);
+    const defTech = Math.max(...def.map((a) => sim.technology.fx(sim.country(a.owner)).defense));
+    const defense = t.defense * (1 + b.fort * 0.12) * (1 + defTech) * (b.river ? 1.2 : 1);
     const attTotal = att.reduce((s, a) => s + soldiersOf(a), 0);
     const defTotal = def.reduce((s, a) => s + soldiersOf(a), 0);
     const lostDef = this.distribute(def, (A * 0.013 * rng.float(0.7, 1.3)) / defense);

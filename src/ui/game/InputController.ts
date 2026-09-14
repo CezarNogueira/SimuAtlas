@@ -142,6 +142,8 @@ export class InputController {
       ui.toggleLeft('history');
     } else if (key === 'g') {
       ui.toggleLeft('wars');
+    } else if (key === 't') {
+      ui.toggleLeft('techs');
     } else if (key === 'e') {
       ui.openModal('stats');
     } else if (key === 'f') {

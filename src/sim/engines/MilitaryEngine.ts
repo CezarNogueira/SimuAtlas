@@ -5,7 +5,6 @@ import { season } from '../../core/calendar';
 import { GOVERNMENTS } from '../../data/governments';
 import { PERSONALITIES } from '../../data/personalities';
 import { terrainInfo } from '../../data/terrain';
-import { hasAirForce, techEffects } from '../../data/techs';
 import type { Army, ArmyMission, Country, General } from '../../state/types';
 import { newGeneral } from '../names';
 import type { CanEnter } from '../Pathfinder';
@@ -35,14 +34,14 @@ export class MilitaryEngine {
 
   armyPower(a: Army): number {
     const c = this.sim.country(a.owner);
-    return (a.infantry + a.cavalry * 1.4 + a.artillery * 1.2) * (1 + techEffects(c.tech).military) * (0.35 + 0.65 * a.morale) * (1 + a.experience * 0.4);
+    return (a.infantry + a.cavalry * 1.4 + a.artillery * 1.2) * (1 + this.sim.technology.fx(c).military) * (0.35 + 0.65 * a.morale) * (1 + a.experience * 0.4);
   }
 
   speed(a: Army): number {
     const c = this.sim.country(a.owner);
     const g = this.general(a);
     const total = Math.max(1, soldiersOf(a));
-    return (1 + techEffects(c.tech).movement) * (1 + (g?.maneuver ?? 0) * 0.04) * (a.mission === 'retreat' ? 1.25 : 1) * (a.cavalry / total > 0.3 ? 1.1 : 1);
+    return (1 + this.sim.technology.fx(c).transport) * (1 + (g?.maneuver ?? 0) * 0.04) * (a.mission === 'retreat' ? 1.25 : 1) * (a.cavalry / total > 0.3 ? 1.1 : 1);
   }
 
   canUseSea(countryId: number): boolean {
@@ -293,7 +292,7 @@ export class MilitaryEngine {
       }
       const c = sim.country(country);
       const g = this.general(leader);
-      const rate = clamp(power / this.garrison(pid), 0.3, 2) * (1 + (art / Math.max(1, total)) * 1.5 + techEffects(c.tech).siege) * (1 + (g?.siege ?? 0) * 0.08);
+      const rate = clamp(power / this.garrison(pid), 0.3, 2) * (1 + (art / Math.max(1, total)) * 1.5 + this.sim.technology.fx(c).siege) * (1 + (g?.siege ?? 0) * 0.08);
       ps.siege.progress += rate;
       // Cerco: lavouras queimadas, rebanhos confiscados e arredores saqueados.
       ps.devastation = Math.min(1, ps.devastation + 0.0008);
@@ -475,10 +474,10 @@ export class MilitaryEngine {
     let coastal = 0;
     for (const p of owned) if (sim.map.coastal[p]) coastal++;
     const pers = PERSONALITIES[c.personality];
-    const target = coastal > 0 ? coastal * (0.8 + c.tech / 12) * (0.6 + pers.tradeSeek * 0.4 + pers.militaryBudget) : 0;
+    const target = coastal > 0 ? coastal * (0.8 + c.tech / 12) * (0.6 + pers.tradeSeek * 0.4 + pers.militaryBudget) * (1 + this.sim.technology.fx(c).naval) : 0;
     c.navy += (target - c.navy) * 0.05;
     if (target > 0 && c.navy < 1) c.navy = 1;
-    if (hasAirForce(c.tech)) c.airForce += (c.armySize / 15000 - c.airForce) * 0.05;
+    if (this.sim.technology.hasAirForce(c)) c.airForce += (c.armySize / 15000 - c.airForce) * 0.05;
   }
 
   monthly(): void {

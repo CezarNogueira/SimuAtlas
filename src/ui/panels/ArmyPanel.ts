@@ -1,7 +1,6 @@
 // Painel do exercito: tropas, moral, experiencia, suprimento, general, situacao e ordens.
 import { fmtCompact, fmtInt, fmtPct } from '../../core/format';
 import { terrainInfo } from '../../data/terrain';
-import { cavalryName } from '../../data/techs';
 import { soldiersOf } from '../../sim/engines/MilitaryEngine';
 import { bar, esc, icon, kv } from '../dom';
 import type { GameUI } from '../game/GameUI';
@@ -51,7 +50,7 @@ export class ArmyPanel extends BasePanel {
     const tropas = kvGrid([
       kv('sword', 'Soldados', fmtInt(soldiersOf(a))),
       kv('helmet', 'Infantaria', fmtInt(a.infantry)),
-      kv('flag', cavalryName(c.tech), fmtInt(a.cavalry)),
+      kv('flag', this.sim.technology.cavalryName(c), fmtInt(a.cavalry)),
       kv('castle', 'Artilharia', fmtInt(a.artillery)),
       kv('swords', 'Poder de combate', fmtCompact(sim.military.armyPower(a))),
     ]);

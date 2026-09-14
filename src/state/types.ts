@@ -115,6 +115,9 @@ export interface Country {
   maxManpower: number;
   navy: number; // navios
   airForce: number; // esquadroes
+  // Tecnologia: conhecimento e producao de cada tecnologia, e a base cientifica do pais.
+  techs: Record<string, TechHolding>;
+  science: ScienceState;
   // Agregados recalculados
   provinceCount: number;
   area: number;
@@ -337,7 +340,9 @@ export type HistoryType =
   | 'founded'
   | 'destroyed'
   | 'diplomacy'
-  | 'disaster';
+  | 'disaster'
+  | 'era'
+  | 'espionage';
 
 export interface HistoryEntry {
   id: number;
@@ -349,6 +354,100 @@ export interface HistoryEntry {
   war: number;
   battle: number;
   importance: 1 | 2 | 3;
+}
+
+// ---------- Tecnologia ----------
+
+// pesquisa: desenvolvendo por conta propria; importacao: compra produtos prontos de quem produz;
+// conhecimento: domina a tecnologia e adapta fabricas, insumos e mao de obra; producao: produz em larga escala.
+export type TechStage = 'pesquisa' | 'importacao' | 'conhecimento' | 'producao';
+
+export type TechAcquisition =
+  | 'descoberta'
+  | 'pre_existente'
+  | 'heranca'
+  | 'compra'
+  | 'tratado'
+  | 'licenciamento'
+  | 'investimento'
+  | 'espionagem'
+  | 'roubo'
+  | 'guerra'
+  | 'conquista'
+  | 'transferencia'
+  | 'intercambio'
+  | 'universidades'
+  | 'migracao'
+  | 'pesquisa'
+  | 'independente'
+  | 'observador';
+
+// aberta: vende a tecnologia e os produtos; licencia: licencia com royalties e exporta;
+// exporta: so vende os produtos; segredo: uso exclusivamente interno.
+export type TechPolicy = 'aberta' | 'licencia' | 'exporta' | 'segredo';
+
+export interface TechHolding {
+  stage: TechStage;
+  progress: number; // pesquisa/importacao: desenvolvimento proprio 0..1; conhecimento: adaptacao produtiva 0..1
+  source: TechAcquisition | null; // como obteve o conhecimento (null enquanto pesquisa ou importa)
+  since: number; // dia em que entrou no estagio atual
+  acquired: number; // dia em que obteve o conhecimento (-1 se ainda nao)
+  supplier: number; // pais fornecedor (importacao, licenca ou investimento), -1 se nenhum
+  policy: TechPolicy;
+}
+
+export interface ScienceState {
+  education: number; // 0..1: alfabetizacao e ensino
+  universities: number;
+  scientists: number;
+  capacity: number; // capacidade de pesquisa relativa a referencia da epoca
+  industrialization: number; // 0..1
+  intelligence: number; // 0..1: servicos de inteligencia
+  security: number; // 0..1: contraespionagem
+  spending: number; // gasto mensal com pesquisa e adaptacao produtiva
+  techIncome: number; // receita mensal com vendas, licencas e exportacoes de tecnologia
+  techCosts: number; // despesa mensal com compras, royalties e importacoes
+  nextTrade: number; // dia da proxima avaliacao do mercado tecnologico
+  nextEspionage: number;
+}
+
+export type TechLogType = 'descoberta' | 'pre_existente' | 'aquisicao' | 'producao' | 'importacao' | 'politica' | 'espionagem_fracassada' | 'monopolio' | 'obsoleta';
+
+export interface TechLogEntry {
+  day: number;
+  type: TechLogType;
+  country: number;
+  other: number; // pais de origem da transferencia (-1)
+  source: TechAcquisition | null;
+}
+
+export interface TechRecord {
+  discovered: boolean;
+  discoverer: number; // pais descobridor na simulacao (-1 se ainda nao descoberta)
+  discoveryDay: number; // dia da descoberta (valores negativos: antes do inicio da partida)
+  discoveryYear: number;
+  preStart: boolean; // ja existia quando a partida comecou
+  holders: number; // paises com conhecimento
+  producers: number;
+  importers: number;
+  researchers: number;
+  monopolyEnded: number; // dia em que outro pais passou a dominar a tecnologia (-1)
+  marketPrice: number; // preco de referencia no mercado (custo atual)
+  obsolete: boolean;
+  log: TechLogEntry[];
+}
+
+export type TechContractType = 'importacao' | 'licenciamento' | 'investimento';
+
+export interface TechContract {
+  id: number;
+  type: TechContractType;
+  tech: string;
+  buyer: number;
+  seller: number;
+  start: number;
+  end: number; // -1 = enquanto durar a relacao comercial
+  monthly: number; // pagamento mensal do comprador ao vendedor
 }
 
 export interface StatsSeries {
@@ -363,7 +462,6 @@ export interface StatsState {
   world: StatsSeries & { countries: number[]; wars: number[] };
   countries: Record<number, StatsSeries>;
   snapshots: { year: number; owners: number[] }[];
-  techFirsts: Record<string, number>;
 }
 
 export interface SimSettings {
@@ -394,7 +492,12 @@ export interface GameState {
   relations: [number, number][];
   history: HistoryEntry[];
   stats: StatsState;
-  nextId: { army: number; war: number; battle: number; treaty: number; history: number; person: number };
+  // Tecnologia e eras.
+  era: string; // era historica atual (definida pelo ano)
+  techBaseline: number; // nivel tecnologico medio no inicio (referencia da economia e da populacao)
+  technologies: Record<string, TechRecord>;
+  techContracts: TechContract[];
+  nextId: { army: number; war: number; battle: number; treaty: number; history: number; person: number; contract: number };
 }
 
 export const DEFAULT_SETTINGS: SimSettings = {

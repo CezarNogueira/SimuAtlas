@@ -8,7 +8,8 @@ import { PERSONALITIES, PERSONALITY_IDS } from '../../data/personalities';
 import { RELIGIONS } from '../../data/religions';
 import { RESOURCES } from '../../data/resources';
 import { terrainInfo } from '../../data/terrain';
-import { cavalryName, eraName, hasAirForce, nextTech, unlockedTechs } from '../../data/techs';
+import { HISTORICAL_ERAS, eraSpan } from '../../data/eras';
+import { ACQUISITION_LABELS, POLICY_LABELS } from '../../sim/technology/TechnologyHistoryEngine';
 import { relationLabel, TREATY_NAMES } from '../../sim/engines/DiplomacyEngine';
 import { soldiersOf } from '../../sim/engines/MilitaryEngine';
 import { GOAL_NAMES } from '../../sim/engines/WarEngine';
@@ -19,7 +20,7 @@ import type { War } from '../../state/types';
 import { chartColor, LineChart } from '../charts/LineChart';
 import { bar, centerBar, esc, flag, icon, kv } from '../dom';
 import type { GameUI } from '../game/GameUI';
-import { armyStatus, cLink, countryOptions, dateOf, historyList, kvGrid, pLink, sec, warLink } from './common';
+import { armyStatus, cLink, countryOptions, dateOf, historyList, kvGrid, pLink, sec, techDot, techLink, warLink } from './common';
 import { BasePanel } from './Panel';
 
 const barRow = (v: number, color: string) => `<span></span><div class="full">${bar(v, color)}</div>`;
@@ -41,7 +42,7 @@ export class NationPanel extends BasePanel {
   protected tabs(): [string, string][] {
     const c = this.sim.country(this.id);
     if (!c.alive) return [['geral', 'Geral'], ['historico', 'Histórico']];
-    const base: [string, string][] = [['geral', 'Geral'], ['economia', 'Economia'], ['militar', 'Militar'], ['diplomacia', 'Diplomacia'], ['territorio', 'Territórios'], ['historico', 'Histórico']];
+    const base: [string, string][] = [['geral', 'Geral'], ['economia', 'Economia'], ['militar', 'Militar'], ['tecnologia', 'Tecnologia'], ['diplomacia', 'Diplomacia'], ['territorio', 'Territórios'], ['historico', 'Histórico']];
     if (c.kind === 'nation') base.push(['acoes', 'Ações']);
     return base;
   }
@@ -75,6 +76,7 @@ export class NationPanel extends BasePanel {
     switch (this.tab) {
       case 'economia': return this.economia();
       case 'militar': return this.militar();
+      case 'tecnologia': return this.tecnologia();
       case 'diplomacia': return this.diplomacia();
       case 'territorio': return this.territorio();
       case 'historico': return historyList(this.sim, this.sim.history.forCountry(this.id, 150));
@@ -119,7 +121,7 @@ export class NationPanel extends BasePanel {
     const topRes = [...resources.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([r, n]) => `${RESOURCES[r as keyof typeof RESOURCES].name} (${n})`).join(', ') || '—';
     const nation = c.kind === 'nation' && c.alive;
     const rank = (m: 'population' | 'gdp' | 'army' | 'area' | 'tech') => (nation ? ` <span class="muted">#${sim.stats.rankOf(c.id, m)}</span>` : '');
-    const next = nextTech(c.tech);
+    const mainResearch = Object.entries(c.techs).filter(([, h]) => h.stage === 'pesquisa').sort((a, b) => b[1].progress - a[1].progress)[0];
     const age = agePt(c.ruler.birthDay, sim.day);
     const wars = sim.wars.warsOf(c.id);
     const vassals = sim.state.countries.filter((v) => v.alive && v.overlord === c.id);
@@ -159,8 +161,8 @@ export class NationPanel extends BasePanel {
       kv('temple', 'Religião', esc(RELIGIONS[c.religion].name)),
       kv('people', 'Cultura', esc(CULTURES[c.culture].name)),
       kv('info', 'Personalidade (IA)', `<span title="${esc(pers.description)}">${esc(pers.name)}</span>`),
-      kv('gear', 'Tecnologia', `${fmtDec(c.tech)} · ${esc(eraName(c.tech))}${rank('tech')}`),
-      kv('gear', 'Próxima descoberta', next ? esc(next.name) : '—'),
+      kv('gear', 'Nível tecnológico', `${fmtDec(c.tech)}${rank('tech')}`),
+      kv('gear', 'Pesquisa principal', mainResearch ? techLink(sim, mainResearch[0]) : '—'),
       kv('sword', 'Poder militar', fmtCompact(sim.countries.strength(c.id)) + rank('army')),
       kv('scroll', 'Diplomacia autônoma', c.ai ? 'Sim' : 'Não (controle manual)'),
     ]);
@@ -264,10 +266,10 @@ export class NationPanel extends BasePanel {
     const rows = kvGrid([
       kv('sword', 'Exército', `${fmtInt(inf + cav + art)} soldados`),
       kv('helmet', 'Infantaria', fmtInt(inf)),
-      kv('flag', cavalryName(c.tech), fmtInt(cav)),
+      kv('flag', sim.technology.cavalryName(c), fmtInt(cav)),
       kv('castle', 'Artilharia', fmtInt(art)),
       kv('anchor', 'Marinha', `${Math.round(c.navy)} navios`),
-      kv('plane', 'Força aérea', hasAirForce(c.tech) ? `${Math.round(c.airForce)} esquadrões` : 'Não disponível'),
+      kv('plane', 'Força aérea', sim.technology.hasAirForce(c) ? `${Math.round(c.airForce)} esquadrões` : 'Não disponível'),
       kv('trophy', 'Experiência', fmtPct(exp / total, 0)),
       kv('smile', 'Moral', fmtPct(morale / total, 0)), barRow(morale / total, 'var(--green)'),
       kv('chest', 'Logística', fmtPct(supply / total, 0)),
@@ -307,6 +309,91 @@ export class NationPanel extends BasePanel {
       })
       .join('');
     return `<div class="rows">${cur}</div><div class="muted" style="margin-top:6px">Guerras anteriores:</div><div class="rows">${past || '<div class="muted">Nenhuma.</div>'}</div>`;
+  }
+
+  // Ciencia, pesquisas, adaptacao produtiva, importacoes, contratos, monopolios e tecnologias por era.
+  private tecnologia(): string {
+    const sim = this.sim;
+    const c = sim.country(this.id);
+    const tech = sim.technology;
+    const db = tech.db;
+    const s = c.science;
+    const year = sim.year();
+    const nation = c.kind === 'nation' && c.alive;
+    const rank = nation ? ` <span class="muted">#${sim.stats.rankOf(c.id, 'tech')}</span>` : '';
+    const ciencia = kvGrid([
+      kv('globe', 'Era atual', esc(sim.eras.current().name)),
+      kv('gear', 'Nível tecnológico', `${fmtDec(c.tech)}${rank}`),
+      kv('chart', 'Capacidade de pesquisa', `${fmtDec(s.capacity)} <span class="muted">(1,5 = líderes)</span>`),
+      kv('book', 'Educação', fmtPct(s.education, 0)), barRow(s.education, 'var(--blue)'),
+      kv('temple', 'Universidades', fmtInt(s.universities)),
+      kv('people', 'Cientistas', fmtCompact(s.scientists)),
+      kv('building', 'Industrialização', fmtPct(s.industrialization, 0)), barRow(s.industrialization, 'var(--gold)'),
+      kv('target', 'Inteligência', fmtPct(s.intelligence, 0)),
+      kv('shield', 'Contraespionagem', fmtPct(s.security, 0)),
+      kv('coins', 'Pesquisa e fábricas', `${fmtMoney(s.spending)}/mês`),
+      kv('chest', 'Receitas tecnológicas', `${fmtMoney(s.techIncome)}/mês`),
+      kv('coins', 'Compras e royalties', `${fmtMoney(s.techCosts)}/mês`),
+    ]);
+    const holdings = Object.entries(c.techs)
+      .map(([id, h]) => ({ t: db.get(id), h }))
+      .filter((x): x is { t: NonNullable<typeof x.t>; h: typeof x.h } => !!x.t);
+    const progressRow = (id: string, name: string, label: string, progress: number) =>
+      `<div class="row link" data-tech="${esc(id)}"><span class="grow">${esc(name)}</span><span class="muted">${esc(label)}</span><span class="num">${fmtPct(progress, 0)}</span></div><div style="margin:-2px 0 4px">${bar(progress, 'var(--gold)')}</div>`;
+    const research = holdings.filter((x) => x.h.stage === 'pesquisa').sort((a, b) => b.h.progress - a.h.progress);
+    const researchHtml = research.length
+      ? research.map((x) => {
+        const rec = tech.record(x.t.id);
+        const label = x.t.anoDescoberta > year ? `preparatória · possível em ${x.t.anoDescoberta}` : !rec.discovered ? 'corrida pela descoberta' : 'desenvolvimento próprio';
+        return progressRow(x.t.id, x.t.nome, label, x.h.progress);
+      }).join('')
+      : '<div class="muted">Nenhum projeto em andamento.</div>';
+    const adapting = holdings.filter((x) => x.h.stage === 'conhecimento').sort((a, b) => b.h.progress - a.h.progress);
+    const adaptHtml = adapting.length
+      ? adapting.map((x) => progressRow(x.t.id, x.t.nome, x.h.source ? ACQUISITION_LABELS[x.h.source] : '', x.h.progress)).join('')
+      : '<div class="muted">Nenhuma tecnologia aguardando produção.</div>';
+    const imports = holdings.filter((x) => x.h.stage === 'importacao');
+    const importsHtml = imports.length
+      ? `<div class="rows">${imports.map((x) => `<div class="row">${techLink(sim, x.t.id)}<span class="grow"></span><span class="muted">de ${cLink(sim, x.h.supplier)}</span></div>`).join('')}</div>`
+      : '<div class="muted">Nenhuma importação.</div>';
+    const contractNames = { importacao: 'Importação', licenciamento: 'Licença', investimento: 'Investimento' } as const;
+    const contracts = tech.trade.contractsOf(c.id);
+    const contractsHtml = contracts.length
+      ? `<div class="rows">${contracts.map((k) => `<div class="row"><span class="grow">${contractNames[k.type]}: ${techLink(sim, k.tech)} · ${cLink(sim, k.buyer === c.id ? k.seller : k.buyer)}</span><span class="num ${k.buyer === c.id ? 'neg' : 'pos'}">${k.buyer === c.id ? '−' : '+'}${fmtMoney(k.monthly)}/mês</span></div>`).join('')}</div>`
+      : '<div class="muted">Nenhum contrato em vigor.</div>';
+    const produced = holdings.filter((x) => x.h.stage === 'producao');
+    const monopolies = produced.filter((x) => tech.record(x.t.id).holders <= 1);
+    const policies = (['aberta', 'licencia', 'exporta', 'segredo'] as const).map((p) => `${esc(POLICY_LABELS[p])}: ${produced.filter((x) => x.h.policy === p).length}`).join(' · ');
+    const secrets = produced.filter((x) => x.h.policy === 'segredo');
+    const propriedade = kvGrid([
+      kv('building', 'Tecnologias produzidas', fmtInt(produced.length)),
+      `<span></span><span class="list">${policies}</span>`,
+      kv('crown', 'Monopólios', monopolies.length ? monopolies.map((x) => techLink(sim, x.t.id)).join(', ') : 'nenhum'),
+      kv('shield', 'Mantidas em segredo', secrets.length ? `${secrets.length}` : 'nenhuma'),
+    ]);
+    const eras = HISTORICAL_ERAS.map((e) => {
+      const all = db.byEra(e.id);
+      const available = all.filter((t) => t.anoDescoberta <= year).length;
+      if (!available) return '';
+      const known = all.filter((t) => tech.knows(c, t.id)).length;
+      return `<div class="row"><span class="grow">${esc(e.name)} <span class="muted">(${eraSpan(e)})</span></span><span class="num">${known}/${available}</span></div><div style="margin:-2px 0 4px">${bar(known / available, 'var(--green)')}</div>`;
+    }).join('');
+    const recent = holdings
+      .filter((x) => (x.h.stage === 'conhecimento' || x.h.stage === 'producao') && x.h.source && x.h.source !== 'pre_existente' && x.h.source !== 'heranca')
+      .sort((a, b) => b.h.acquired - a.h.acquired)
+      .slice(0, 12)
+      .map((x) => `<div class="row link" data-tech="${esc(x.t.id)}">${techDot(tech.status(c, x.t.id))}<span class="grow">${esc(x.t.nome)}</span><span class="muted">${sim.year(x.h.acquired)} · ${esc(ACQUISITION_LABELS[x.h.source ?? 'pesquisa'])}</span></div>`)
+      .join('');
+    return (
+      sec('Ciência e pesquisa', 'gear', ciencia) +
+      sec(`Pesquisas em andamento (${research.length})`, 'book', researchHtml) +
+      sec(`Adaptação à produção (${adapting.length})`, 'building', adaptHtml) +
+      sec('Propriedade tecnológica', 'crown', propriedade) +
+      sec(`Importações (${imports.length})`, 'coins', importsHtml) +
+      sec(`Contratos tecnológicos (${contracts.length})`, 'scroll', contractsHtml) +
+      sec('Tecnologias dominadas por era', 'chart', eras) +
+      sec('Aquisições recentes', 'scroll', recent ? `<div class="rows">${recent}</div>` : '<div class="muted">Nenhuma aquisição desde o início.</div>')
+    );
   }
 
   private diplomacia(): string {
@@ -389,8 +476,8 @@ export class NationPanel extends BasePanel {
           })
           .join('')}</table>${owned.length > 80 ? `<div class="muted">… e mais ${owned.length - 80} estados.</div>` : ''}`
       : '<div class="muted">Nenhum estado.</div>';
-    const techs = unlockedTechs(c.tech);
-    const techHtml = `${techs.map((t) => `<span class="chip" title="${esc(t.description)}">${esc(t.name)}</span>`).join('')}${nextTech(c.tech) ? `<div class="muted">Próxima: ${esc(nextTech(c.tech)?.name ?? '')} (nível ${nextTech(c.tech)?.level})</div>` : ''}`;
+    const knownTechs = Object.values(c.techs).filter((h) => h.stage === 'conhecimento' || h.stage === 'producao').length;
+    const techHtml = `<div class="muted">${knownTechs} tecnologias dominadas · nível tecnológico ${fmtDec(c.tech)}. Detalhes na aba Tecnologia.</div>`;
     const traits = [...c.traits, ...c.modifiers.map((m) => m.name)];
     const traitsHtml = traits.length ? traits.map((t) => `<span class="chip gold">${esc(t)}</span>`).join('') : `<span class="chip">${esc(PERSONALITIES[c.personality].name)}</span><span class="chip">${esc(CULTURES[c.culture].name)}</span><span class="chip">${esc(RELIGIONS[c.religion].name)}</span>`;
     return (
@@ -437,7 +524,7 @@ export class NationPanel extends BasePanel {
         <div class="action">${sel('pers', persOpts)}<button class="px-btn small" data-action="personality">Definir personalidade</button></div>
         <div class="action">${btn('stab-up', 'Estabilidade +15', 'scales')}${btn('stab-down', 'Estabilidade −15', 'scales')}${btn('corruption', 'Combater corrupção', 'coins')}${btn('prestige', 'Prestígio +15', 'crown')}</div>
         <div class="action">${btn('incite', 'Incitar rebelião', 'fire')}${btn('civil-war', 'Provocar guerra civil', 'fire')}</div>`) +
-      sec('Recursos', 'chest', `<div class="action">${btn('grant-army', 'Conceder exército', 'sword')}${btn('grant-gold', 'Conceder ouro', 'coins')}${btn('tech', 'Avançar tecnologia', 'gear')}</div>`) +
+      sec('Recursos', 'chest', `<div class="action">${btn('grant-army', 'Conceder exército', 'sword')}${btn('grant-gold', 'Conceder ouro', 'coins')}${btn('tech', 'Conceder tecnologia', 'gear')}</div>`) +
       sec('Eventos', 'info', `<div class="action">${sel('event', eventOpts)}<button class="px-btn small" data-action="event">Disparar evento</button></div>`) +
       sec('Identidade', 'flag', `<div class="action"><input class="px-input" data-f="name" data-change="remember" placeholder="Novo nome" value="${esc(f.name)}"><button class="px-btn small" data-action="rename">Renomear</button></div>`)
     );
