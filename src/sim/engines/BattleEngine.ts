@@ -256,6 +256,11 @@ export class BattleEngine {
         war.casualties[other] += loseSide.losses;
       }
     }
+    // O campo de batalha fica arrasado: plantacoes pisoteadas, pontes, estradas e vilas destruidas.
+    const ps = sim.state.provinces[b.province];
+    const fallen = b.attacker.losses + b.defender.losses;
+    ps.devastation = Math.min(1, ps.devastation + clamp(fallen / 150000, 0.005, 0.08));
+    ps.development = Math.max(1, ps.development - clamp(fallen / 100000, 0.03, 0.5));
     const total = this.totals(b.attacker) + this.totals(b.defender);
     const prestige = clamp(total / 40000, 0.3, 4);
     for (const id of winSide.countries) {

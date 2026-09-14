@@ -295,6 +295,8 @@ export class MilitaryEngine {
       const g = this.general(leader);
       const rate = clamp(power / this.garrison(pid), 0.3, 2) * (1 + (art / Math.max(1, total)) * 1.5 + techEffects(c.tech).siege) * (1 + (g?.siege ?? 0) * 0.08);
       ps.siege.progress += rate;
+      // Cerco: lavouras queimadas, rebanhos confiscados e arredores saqueados.
+      ps.devastation = Math.min(1, ps.devastation + 0.0008);
       if (ps.siege.progress >= ps.siege.needed) this.completeSiege(pid, country, list);
     }
   }
@@ -307,11 +309,17 @@ export class MilitaryEngine {
     const liberation = owner === country || (owner >= 0 && sim.wars.sameSide(country, owner) && sim.index.atWar(owner, previous));
     const war = sim.wars.warBetween(country, previous);
     sim.provinces.setController(pid, liberation ? owner : country);
+    if (!liberation) {
+      // Cidade tomada: saques e incendios destroem oficinas, pontes, estradas e armazens.
+      ps.devastation = Math.min(1, ps.devastation + 0.08);
+      ps.development = Math.max(1, ps.development * 0.95 - 0.1);
+      ps.population = Math.max(500, ps.population * 0.995);
+    }
     const city = sim.provinces.cityName(pid);
     const who = sim.countries.subject(country);
     const text = liberation
       ? `${who} ${sim.countries.verb(country, 'libertou', 'libertaram')} ${city}.`
-      : `${who} ${sim.countries.verb(country, 'conquistou', 'conquistaram')} ${city}${owner >= 0 && owner !== country ? ` (${sim.country(owner).name})` : ''}.`;
+      : `${who} ${sim.countries.verb(country, 'conquistou', 'conquistaram')} ${city}${owner >= 0 && owner !== country ? ` (${sim.country(owner).name})` : ''}, saqueando a cidade.`;
     if (war) war.log.push({ day: sim.day, text });
     sim.history.add('conquest', text, { countries: [country, previous], province: pid, war: war?.id ?? -1, importance: 1 });
     for (const a of list) {
@@ -381,8 +389,11 @@ export class MilitaryEngine {
     const atWar = sim.index.isAtWar(c.id);
     let t = c.population * sim.era.mobilization * gov.military * (0.5 + pers.militaryBudget * 3);
     if (atWar) t *= 2.2;
-    const perSoldier = sim.economy.soldierMonthlyCost(c);
-    const affordable = (c.income * (atWar ? 0.75 : 0.25 + pers.militaryBudget)) / Math.max(1e-6, perSoldier);
+    // Em guerra cada soldado custa bem mais (armamentos, municao, provisoes) e o governo financia o
+    // exercito com divida enquanto houver credito; esgotado o credito, o exercito que da para manter encolhe.
+    const perSoldier = sim.economy.soldierMonthlyCost(c) * sim.economy.warCostFactor(c);
+    const credit = atWar ? sim.economy.warCredit(c) / 12 : 0;
+    const affordable = (c.income * (atWar ? 0.9 : 0.25 + pers.militaryBudget) + credit) / Math.max(1e-6, perSoldier);
     if (affordable > 0) t = Math.min(t, affordable * (c.treasury > c.income * 6 ? 1.3 : 1));
     const mod = c.modifiers.reduce((acc, m) => acc + (m.military ?? 0), 0);
     return Math.max(0, t * (1 + mod));
@@ -424,7 +435,8 @@ export class MilitaryEngine {
     if (current < target * 0.97) {
       const unitCost = sim.economy.recruitCost(c, 1);
       let want = Math.min(target - current, c.manpower * 0.4);
-      want = Math.min(want, (c.treasury * (atWar ? 0.8 : 0.4)) / Math.max(1e-6, unitCost));
+      // Em guerra, recrutas e armamentos podem ser comprados a credito (o saldo negativo vira divida).
+      want = Math.min(want, (c.treasury * (atWar ? 0.8 : 0.4) + (atWar ? sim.economy.warCredit(c) * 0.2 : 0)) / Math.max(1e-6, unitCost));
       if (want < 200) return;
       let used = 0;
       const chunk = sim.era.armyChunk * (1 + c.tech / 30);
@@ -488,8 +500,11 @@ export class MilitaryEngine {
       const mp = sim.map.provinces[a.location];
       const t = terrainInfo(mp.terrain);
       const friendly = sim.diplomacy.accessSet(a.owner).has(ps.controller);
-      const capacity = (ps.population * 0.02 + 8000) * t.supply * (friendly ? 1.6 : 0.8) * (1 + ps.development / 15);
+      // Terra arrasada abastece mal: exercitos em estados destruidos passam fome e sofrem mais atricao.
+      const capacity = (ps.population * 0.02 + 8000) * t.supply * (friendly ? 1.6 : 0.8) * (1 + ps.development / 15) * (1 - ps.devastation * 0.7);
       const stacked = stack.get(a.location * 8192 + a.owner) ?? soldiersOf(a);
+      // Exercitos em territorio inimigo vivem do saque: confiscam colheitas e destroem o que encontram.
+      if (!friendly && a.battle < 0) ps.devastation = Math.min(1, ps.devastation + 0.006 * Math.min(1, soldiersOf(a) / 40000));
       a.supply = clamp(capacity / Math.max(1, stacked), 0.2, 1);
       const winter = season(day, mp.lat) === 0 && Math.abs(mp.lat) > 40;
       const rate = t.attrition * (winter ? 2 : 1) + (1 - a.supply) * 0.05 + (a.naval ? 0.01 : 0);

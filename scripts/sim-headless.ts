@@ -26,6 +26,12 @@ const counts = new Map<HistoryType, number>();
 sim.bus.on('history', (e) => counts.set(e.type, (counts.get(e.type) ?? 0) + 1));
 let battles = 0;
 sim.bus.on('battleEnded', () => battles++);
+const hardships = { escassez: 0, divida: 0, moratoria: 0 };
+sim.bus.on('history', (e) => {
+  if (e.text.startsWith('Escassez')) hardships.escassez++;
+  else if (e.text.includes('afunda em dívidas')) hardships.divida++;
+  else if (e.text.includes('moratória')) hardships.moratoria++;
+});
 
 function integrity(): string[] {
   const s = sim.state;
@@ -88,6 +94,17 @@ for (const w of [...active].sort((a, b) => a.start - b.start).slice(0, 6)) {
       `ultima batalha: ${lastBattle >= 0 ? `${((sim.day - lastBattle) / 365).toFixed(1)}a atras` : 'nenhuma'} | ocupados ${w.occupied.join('/')} | exaustao ${w.exhaustion.map((e) => e.toFixed(0)).join('/')}`,
   );
 }
+const avg = (list: number[]) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : 0);
+const pct = (v: number) => `${Math.round(v * 100)}%`;
+const warring = sim.countries.nations().filter((c) => sim.index.isAtWar(c.id));
+const peaceful = sim.countries.nations().filter((c) => !sim.index.isAtWar(c.id));
+const describe = (list: typeof warring) =>
+  `${list.length} (inflação ${pct(avg(list.map((c) => c.inflation)))}, dívida ${pct(avg(list.map((c) => c.debt / Math.max(1, c.gdp))))} do PIB` +
+  ` [máx ${pct(Math.max(0, ...list.map((c) => c.debt / Math.max(1, c.gdp))))}], destruição ${pct(avg(list.map((c) => sim.economy.warEconomy(c).devastation)))})`;
+console.log(
+  `Economia: em guerra ${describe(warring)} | em paz ${describe(peaceful)} | estados arrasados: ${sim.state.provinces.filter((p) => p.devastation >= 0.4).length} | ` +
+    `avisos: escassez ${hardships.escassez}, dívida de guerra ${hardships.divida}, moratórias ${hardships.moratoria}`,
+);
 const tech = sim.countries.nations().reduce((acc, c) => Math.max(acc, c.tech), 0);
 console.log(`Tecnologia máxima: ${tech.toFixed(1)}`);
 console.log('\nÚltimos acontecimentos importantes:');

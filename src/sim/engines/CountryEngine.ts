@@ -367,14 +367,15 @@ export class CountryEngine {
       const debtRatio = c.gdp > 0 ? c.debt / c.gdp : 0;
       let target =
         55 + gov.stability + ideology.stability + c.ruler.skills.adm * 1.1 - c.corruption * 40 - c.warExhaustion * 0.35 -
-        (unrest / n) * 0.25 - (nonCore / n) * 22 - Math.min(15, debtRatio * 12) - c.inflation * 40 +
+        (unrest / n) * 0.25 - (nonCore / n) * 22 - Math.min(15, debtRatio * 12) - Math.min(12, c.inflation * 40) +
         (c.happiness - 50) * 0.25 + c.prestige * 0.08 + modStability;
       if (c.overlord >= 0) target -= 4;
       target = clamp(target, 0, 100);
       c.stability = clamp(c.stability + (target - c.stability) * 0.06, 0, 100);
 
       const growthTerm = clamp(c.growth * 150, -15, 15);
-      const happyTarget = clamp(52 + growthTerm - c.unemployment * 110 - c.inflation * 60 - c.warExhaustion * 0.3 + (c.taxRate < sim.era.taxRate ? 4 : -4), 0, 100);
+      // O efeito da inflacao satura: acima de ~30% o pais ja vive a crise (a escassez e a fome fazem o resto).
+      const happyTarget = clamp(52 + growthTerm - c.unemployment * 110 - Math.min(18, c.inflation * 60) - c.warExhaustion * 0.3 + (c.taxRate < sim.era.taxRate ? 4 : -4), 0, 100);
       c.happiness = clamp(c.happiness + (happyTarget - c.happiness) * 0.1, 0, 100);
 
       const corrTarget = clamp(gov.corruption + owned.length / 300 - c.ruler.skills.adm * 0.01 + (c.stability < 30 ? 0.06 : 0), 0.01, 0.9);

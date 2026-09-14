@@ -56,6 +56,9 @@ export class AIEngine {
     const wars = sim.wars.warsOf(c.id);
     if (sim.day < 540) return;
     if (wars.length >= 2 || c.warExhaustion > 35 || c.stability < 25 || c.overlord >= 0 || c.provinceCount === 0) return;
+    // Economia arrasada por guerras anteriores: sem dinheiro nem credito para outra.
+    const debtRatio = c.debt / Math.max(1, c.gdp);
+    if (debtRatio > 1.1 || c.inflation > 0.3) return;
     const aggression = this.aggressionOf(c);
     const lastWarEnd = c.pastWars.length ? sim.index.warById.get(c.pastWars[c.pastWars.length - 1])?.end ?? -1 : -1;
     const recentPeace = lastWarEnd >= 0 && sim.day - lastWarEnd < 4 * 365 ? 0.5 : 1;
@@ -75,7 +78,7 @@ export class AIEngine {
       if (ratio < 1.15 && !(distracted && ratio > 0.8)) continue;
       const rel = sim.diplomacy.relation(c.id, t);
       let score = aggression * 40 + clamp((ratio - 1) * 25, -20, 60) - rel * 0.35;
-      score -= c.aggressiveExpansion * 0.4 + nonCore * 25 + c.warExhaustion * 0.5;
+      score -= c.aggressiveExpansion * 0.4 + nonCore * 25 + c.warExhaustion * 0.5 + debtRatio * 20 + c.inflation * 50;
       // Rivalidade entre potencias vizinhas de porte semelhante.
       if (rel < -20 && T.provinceCount > c.provinceCount * 0.5 && T.provinceCount < c.provinceCount * 2) score += 15;
       if (distracted) score += pers.opportunism * 25;

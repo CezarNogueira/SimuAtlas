@@ -16,6 +16,7 @@ export type MapModeId =
   | 'development'
   | 'population'
   | 'unrest'
+  | 'devastation'
   | 'economy'
   | 'tech';
 
@@ -43,6 +44,7 @@ export const MAP_MODES: MapModeInfo[] = [
   { id: 'development', name: 'Desenvolvimento', icon: 'building', key: 'I', description: 'Infraestrutura dos estados.' },
   { id: 'population', name: 'População', icon: 'people', key: 'O', description: 'Densidade populacional.' },
   { id: 'unrest', name: 'Agitação', icon: 'fire', key: 'P', description: 'Risco de revoltas.' },
+  { id: 'devastation', name: 'Destruição', icon: 'skull', key: '', description: 'Infraestrutura destruída pela guerra: batalhas, cercos, saques e ocupação.' },
   { id: 'economy', name: 'Economia', icon: 'coins', key: '', description: 'PIB per capita das nações.' },
   { id: 'tech', name: 'Tecnologia', icon: 'gear', key: '', description: 'Nível tecnológico.' },
 ];
@@ -129,6 +131,12 @@ export function buildFill(mode: MapModeId, sim: Simulation, selected: number): F
       };
     case 'unrest':
       return { bordersByOwner: true, legend: [{ color: heat(0), label: 'Calma' }, { color: heat(1), label: 'Revolta iminente' }], fill: (p) => heat(provs[p].unrest / 70) };
+    case 'devastation':
+      return {
+        bordersByOwner: true,
+        legend: [{ color: heat(0), label: 'Intacto' }, { color: heat(1), label: 'Arrasado pela guerra' }],
+        fill: (p) => heat(provs[p].devastation / 0.6),
+      };
     case 'economy': {
       let max = 1;
       for (const c of s.countries) if (c.alive && c.population > 0) max = Math.max(max, c.gdp / c.population);

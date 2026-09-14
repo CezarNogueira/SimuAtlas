@@ -44,6 +44,11 @@ export class HelpModal extends BasePanel {
       da guerra (paz branca ou vitória de um dos lados). Um estado ocupado aparece listrado com a cor do ocupante e, após
       dois anos de ocupação, passa a pertencer a ele; a nação que perde todo o território é anexada. Para voltar aos tratados
       automáticos, ative "Nações fazem as pazes sozinhas" nas configurações.</p>
+      <p><b>A guerra cobra seu preço</b>: tropas em campanha e armamentos custam fortunas e são pagos com dívida; a
+      mobilização, a destruição e a ocupação fazem faltar produtos e a inflação dispara. Batalhas, cercos, saques e
+      ocupação destroem a infraestrutura dos estados, que produzem menos até serem reconstruídos. Sem crédito, os soldos
+      atrasam e os exércitos desertam, e um país pode não ter forças para concluir uma conquista ou sair enfraquecido
+      de uma vitória difícil. Veja o modo de mapa <b>Destruição</b> e a seção <b>Economia de guerra</b> de cada nação.</p>
       <p>
       Cercos mostram uma barra de progresso; batalhas em andamento pulsam no mapa.</p>
       <p>Na aba <b>Ações</b> de cada nação você pode declarar guerras, forçar a paz, formar alianças, incitar rebeliões,

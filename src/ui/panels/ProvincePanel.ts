@@ -4,6 +4,7 @@ import { CULTURES } from '../../data/cultures';
 import { RELIGIONS } from '../../data/religions';
 import { RESOURCES } from '../../data/resources';
 import { terrainInfo } from '../../data/terrain';
+import { DEVASTATION_OUTPUT_LOSS } from '../../sim/engines/EconomyEngine';
 import { soldiersOf } from '../../sim/engines/MilitaryEngine';
 import { bar, esc, icon, kv } from '../dom';
 import type { GameUI } from '../game/GameUI';
@@ -68,7 +69,7 @@ export class ProvincePanel extends BasePanel {
       kv('castle', 'Fortificação', `Nível ${ps.fort}`),
       kv('fire', 'Agitação', `${Math.round(ps.unrest)}%`),
       `<span></span><div class="full">${bar(ps.unrest / 100, 'var(--red-2)')}</div>`,
-      kv('skull', 'Devastação', `${Math.round(ps.devastation * 100)}%`),
+      kv('skull', 'Destruição', `${Math.round(ps.devastation * 100)}%${ps.devastation >= 0.01 ? ` <span class="muted">· produção −${Math.round(ps.devastation * DEVASTATION_OUTPUT_LOSS * 100)}%</span>` : ''}`),
       kv('people', 'Cultura', esc(CULTURES[ps.culture].name)),
       kv('temple', 'Religião', esc(RELIGIONS[ps.religion].name)),
       kv('anchor', 'Geografia', [mp.coast > 0 ? 'costeira' : 'interior', mp.river > 0 ? 'com rio' : '', mp.island ? 'ilha' : ''].filter(Boolean).join(', ')),

@@ -1,6 +1,6 @@
 // Painel da nacao: dados gerais, economia, militar, diplomacia, territorios, historico e acoes de estado.
 import { formatDuration } from '../../core/calendar';
-import { fmtArea, fmtCompact, fmtInt, fmtMoney, fmtPct, fmtSignedPct } from '../../core/format';
+import { fmtArea, fmtCompact, fmtDec, fmtInt, fmtMoney, fmtPct, fmtSignedPct } from '../../core/format';
 import { CULTURES } from '../../data/cultures';
 import { GOVERNMENT_IDS, GOVERNMENTS } from '../../data/governments';
 import { IDEOLOGIES } from '../../data/ideologies';
@@ -152,7 +152,7 @@ export class NationPanel extends BasePanel {
       kv('temple', 'Religião', esc(RELIGIONS[c.religion].name)),
       kv('people', 'Cultura', esc(CULTURES[c.culture].name)),
       kv('info', 'Personalidade (IA)', `<span title="${esc(pers.description)}">${esc(pers.name)}</span>`),
-      kv('gear', 'Tecnologia', `${c.tech.toFixed(1)} · ${esc(eraName(c.tech))}${rank('tech')}`),
+      kv('gear', 'Tecnologia', `${fmtDec(c.tech)} · ${esc(eraName(c.tech))}${rank('tech')}`),
       kv('gear', 'Próxima descoberta', next ? esc(next.name) : '—'),
       kv('sword', 'Poder militar', fmtCompact(sim.countries.strength(c.id)) + rank('army')),
       kv('scroll', 'Diplomacia autônoma', c.ai ? 'Sim' : 'Não (controle manual)'),
@@ -180,10 +180,10 @@ export class NationPanel extends BasePanel {
     const c = sim.country(this.id);
     const gdppc = c.population > 0 ? c.gdp / c.population : 0;
     const base = sim.economy.gdpPerCapita(c);
-    const atWar = sim.index.isAtWar(c.id);
-    const army = c.armySize * sim.economy.soldierMonthlyCost(c) * (atWar ? 1.15 : 1);
-    const navy = (c.navy * base * 30) / 12;
-    const air = (c.airForce * base * 60) / 12;
+    const war = sim.economy.warEconomy(c);
+    const army = c.armySize * sim.economy.soldierMonthlyCost(c) * war.warFactor;
+    const navy = ((c.navy * base * 30) / 12) * (war.atWar ? 1.5 : 1);
+    const air = ((c.airForce * base * 60) / 12) * (war.atWar ? 1.5 : 1);
     const admin = (c.gdp / 12) * 0.03;
     const interest = Math.max(0, c.expenses - army - navy - air - admin);
     const balance = c.income - c.expenses;
@@ -214,7 +214,23 @@ export class NationPanel extends BasePanel {
     const mods = c.modifiers.filter((m) => m.economy || m.growth);
     const modsHtml = mods.length ? mods.map((m) => `<span class="chip ${((m.economy ?? 0) + (m.growth ?? 0)) >= 0 ? 'green' : 'red'}">${esc(m.name)} até ${sim.year(m.until)}</span>`).join('') : '<span class="muted">Nenhum</span>';
     const chart = sim.state.stats.countries[c.id]?.years.length ? `<canvas class="spark" style="height:140px" data-chart="gdp"></canvas>` : '';
-    return sec('Finanças', 'coins', rows) + sec('Modificadores', 'info', modsHtml) + (chart ? sec('PIB ao longo do tempo', 'chart', chart) : '');
+    const inflationLabel = c.inflation >= 0.3 ? 'escassez grave' : c.inflation >= 0.2 ? 'escassez' : c.inflation >= 0.1 ? 'alta' : 'controlada';
+    const warHint =
+      war.atWar || war.devastation > 0.05
+        ? '<div class="hint-box">A guerra custa caro: tropas em campanha, armamentos e munição são pagos com dívida; a mobilização, a destruição e a ocupação fazem faltar produtos e a inflação sobe. Estados arrasados produzem menos até serem reconstruídos, e sem crédito os soldos atrasam e as tropas desertam.</div>'
+        : '';
+    const warRows = kvGrid([
+      kv('swords', 'Situação', war.atWar ? `Em guerra · tropas custam ×${fmtDec(war.warFactor)}` : 'Em paz'),
+      kv('coins', 'Gasto militar', `${fmtMoney(war.militaryCost)} <span class="muted">(${fmtPct(c.income > 0 ? war.militaryCost / c.income : 0, 0)} da receita)</span>`),
+      kv('people', 'Mobilização', fmtPct(war.mobilization, 1)),
+      kv('scroll', 'Crédito de guerra', war.atWar ? (war.credit > 0 ? fmtMoney(war.credit) : '<span class="neg">esgotado</span>') : '—'),
+      kv('fire', 'Inflação', `${fmtPct(c.inflation)} <span class="muted">(${inflationLabel})</span>`),
+      kv('skull', 'Infraestrutura destruída', fmtPct(war.devastation, 0)),
+      barRow(war.devastation, 'var(--red-2)'),
+      kv('building', 'Produção perdida', `${fmtPct(war.lostShare, 0)} <span class="muted">(${fmtPct(war.occupiedShare, 0)} em estados ocupados)</span>`),
+      kv('pin', 'Estados arrasados', String(war.ruined)),
+    ]);
+    return sec('Finanças', 'coins', rows) + sec('Economia de guerra', 'swords', warHint + warRows) + sec('Modificadores', 'info', modsHtml) + (chart ? sec('PIB ao longo do tempo', 'chart', chart) : '');
   }
 
   private militar(): string {

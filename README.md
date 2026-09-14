@@ -66,6 +66,21 @@ o líder de um dos lados é dominado. Um líder reduzido a no máximo dois estad
 fraco que o inimigo, rende-se. Guerras paradas levam os exércitos a ofensivas mais ousadas. A opção "Nações fazem as
 pazes sozinhas" (novo jogo ou configurações) restaura os tratados automáticos.
 
+A guerra tem custos reais para quem luta:
+
+- **Dívida:** tropas em campanha custam de 2,3 a 3,5 vezes mais (soldos, armamentos, munição e provisões). O governo
+  emite títulos para cobrir metade do déficit mesmo tendo reservas e pode se endividar até 120% do PIB para manter
+  os exércitos.
+- **Inflação e escassez:** a dívida, a mobilização, a produção destruída e o território ocupado fazem a inflação
+  subir. Acima de 20% instala-se a escassez, com mais instabilidade e fome, menos produção e menos crescimento.
+- **Destruição:** batalhas, cercos, saques de cidades tomadas e exércitos inimigos vivendo do território destroem a
+  infraestrutura. Estados arrasados produzem até 75% menos, abastecem mal os exércitos e só se recuperam devagar
+  ou com dinheiro para reconstruir.
+- **Crédito esgotado:** sem crédito e com o tesouro vazio, os soldos atrasam, as tropas desertam e o moral cai.
+
+Assim, um país pode ficar sem forças para concluir uma conquista ou sair mais fraco de uma vitória difícil. O modo de
+mapa "Destruição" e a seção "Economia de guerra" do painel de cada nação mostram esses efeitos.
+
 ## Arquitetura
 
 ```

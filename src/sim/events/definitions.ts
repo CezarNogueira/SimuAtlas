@@ -171,7 +171,7 @@ export const EVENTS: EventDefinition[] = [
   },
   {
     id: 'famine', name: 'Fome', category: 'desastre', chance: 0.001,
-    weight: ({ c }) => (c.tech < 16 ? 1 : 0.3) * (c.stability < 30 ? 2 : 1),
+    weight: ({ c }) => (c.tech < 16 ? 1 : 0.3) * (c.stability < 30 ? 2 : 1) * (1 + c.inflation * 2),
     apply: (ctx) => {
       const { c, sim, rng } = ctx;
       let dead = 0;

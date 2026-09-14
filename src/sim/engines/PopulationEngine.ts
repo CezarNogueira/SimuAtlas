@@ -11,7 +11,7 @@ export class PopulationEngine {
     const sim = this.sim;
     const ps = sim.state.provinces[pid];
     const tech = ps.owner >= 0 ? sim.country(ps.owner).tech : sim.era.tech;
-    return ps.capacity * Math.pow(1.13, Math.max(-3, tech - sim.era.tech)) * (1 - ps.devastation * 0.5) * (0.8 + ps.development / 50);
+    return ps.capacity * Math.pow(1.13, Math.max(-3, tech - sim.era.tech)) * (1 - ps.devastation * 0.3) * (0.8 + ps.development / 50);
   }
 
   monthly(): void {
@@ -35,9 +35,11 @@ export class PopulationEngine {
       let annual = base * terrainF * stabilityF * logistic;
       // Ocupacao militar (guerras podem durar ate a dominacao, entao o efeito e moderado).
       if (ps.controller !== ps.owner) annual -= 0.006;
-      annual -= ps.devastation * 0.02;
+      annual -= ps.devastation * 0.008;
       annual += growthMods[ps.owner];
       if (ps.epidemic > 0) annual -= 0.09;
+      // Fome: com inflacao descontrolada falta comida e a populacao encolhe (alem do modificador de escassez).
+      if (c.inflation > 0.3) annual -= (c.inflation - 0.3) * 0.04;
       ps.population = Math.max(500, ps.population * (1 + annual / 12));
     }
   }

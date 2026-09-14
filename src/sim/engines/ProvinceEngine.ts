@@ -129,16 +129,19 @@ export class ProvinceEngine {
       if (!p.cores.includes(p.owner)) target += 12;
       if (p.culture !== c.culture) target += 6;
       if (p.religion !== c.religion) target += 5;
-      target += c.warExhaustion / 6 + c.corruption * 18 + p.devastation * 12;
+      target += c.warExhaustion / 6 + c.corruption * 18 + p.devastation * 8;
       if (p.controller !== p.owner) target += 8;
       if (p.epidemic > 0) target += 10;
       target -= p.development / 6;
       target = clamp(target * gov.rebellion * freq, 0, 100);
       p.unrest += (target - p.unrest) * 0.1;
       if (p.controller !== p.owner) p.devastation = Math.min(1, p.devastation + 0.006);
-      else p.devastation *= 0.94;
+      // Recuperacao natural lenta (mais lenta ainda num pais instavel ou falido); o investimento acelera.
+      else p.devastation *= c.stability > 40 && c.treasury > 0 ? 0.96 : 0.98;
+      // Estado arrasado: estradas, pontes e oficinas abandonadas se deterioram.
+      if (p.devastation > 0.5) p.development = Math.max(1, p.development - 0.01);
       if (p.epidemic > 0) p.epidemic = Math.max(0, p.epidemic - 30);
-      if (p.controller === p.owner && c.stability > 30) {
+      if (p.controller === p.owner && c.stability > 30 && p.devastation < 0.3) {
         p.development = Math.min(30, p.development + 0.003 * (0.5 + c.stability / 100) * (1 + c.tech / 25));
       }
     }
