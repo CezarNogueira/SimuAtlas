@@ -1,4 +1,4 @@
-# Atlas Vivo — simulador geopolítico em pixel art
+# SimuAtlas — simulador geopolítico em pixel art
 
 Simulador de mapas geopolíticos inspirado na experiência de *Fantasy Map Simulator*, escrito do zero
 (sem código, arte ou marcas do jogo original). Nações disputam territórios reais com população, economia,
