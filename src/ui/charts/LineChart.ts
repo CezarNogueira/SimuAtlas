@@ -21,7 +21,7 @@ export interface LineChartOptions {
 const INK = '#2a1c10';
 const INK_SOFT = '#6a4d30';
 const GRID = 'rgba(59, 38, 21, 0.14)';
-const FONT = '12px "Pixelify Sans", monospace';
+const FONT = '12px "Open Sans", system-ui, sans-serif';
 
 export class LineChart {
   private hoverIndex = -1;

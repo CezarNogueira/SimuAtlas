@@ -1,9 +1,9 @@
 // Configuracoes: exibicao do mapa, parametros da simulacao e preferencias da interface.
 import type { RenderSettings } from '../../render/MapRenderer';
 import { CONFLICT_LEVEL_IDS, CONFLICT_LEVELS, type ConflictLevel } from '../../state/types';
-import { esc, icon } from '../dom';
+import { actions, button, CHECK, CHECK_LABEL, FIELD, FIELD_LABEL, modalTitle, MUTED, mutedBlock, section } from '../components';
+import { esc } from '../dom';
 import type { GameUI } from '../game/GameUI';
-import { sec } from './common';
 import { BasePanel } from './Panel';
 
 const RENDER_TOGGLES: [keyof RenderSettings, string][] = [
@@ -18,6 +18,12 @@ const RENDER_TOGGLES: [keyof RenderSettings, string][] = [
   ['showBattles', 'Marcadores de batalha'],
 ];
 
+const GRID = 'grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-[18px] gap-y-1.5';
+
+const checkbox = (change: string, label: string, checked: boolean, attrs = '') =>
+  `<label class="${CHECK_LABEL}"><input class="${CHECK}" type="checkbox" data-change="${change}"${attrs ? ` ${attrs}` : ''}${checked ? ' checked' : ''}>${esc(label)}</label>`;
+const option = (value: string, label: string, selected: boolean) => `<option value="${value}"${selected ? ' selected' : ''}>${esc(label)}</option>`;
+
 export class SettingsModal extends BasePanel {
   constructor(ui: GameUI) {
     super(ui, 'modal narrow');
@@ -28,48 +34,51 @@ export class SettingsModal extends BasePanel {
   }
 
   protected renderHead(): string {
-    return `${icon('gear', 32)}<h2>Configurações</h2><button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>`;
+    return modalTitle('gear', 'Configurações');
   }
 
   protected renderBody(): string {
     const r = this.ui.renderer.settings;
     const s = this.sim.state.settings;
     const p = this.ui.prefs;
-    const toggles = RENDER_TOGGLES.map(([key, label]) => `<label><input class="px-check" type="checkbox" data-change="render" data-key="${key}"${r[key] ? ' checked' : ''}> ${esc(label)}</label>`).join('');
-    const armies = `<label class="col">Exércitos visíveis
-      <select class="px-select" data-change="armies">
-        <option value="war"${r.showArmies === 'war' ? ' selected' : ''}>Apenas nações em guerra</option>
-        <option value="all"${r.showArmies === 'all' ? ' selected' : ''}>Todos</option>
-        <option value="none"${r.showArmies === 'none' ? ' selected' : ''}>Nenhum (só a nação selecionada)</option>
+    const toggles = RENDER_TOGGLES.map(([key, label]) => checkbox('render', label, !!r[key], `data-key="${key}"`)).join('');
+    const armies = `<label class="${FIELD_LABEL}">Exércitos visíveis
+      <select class="${FIELD}" data-change="armies">
+        ${option('war', 'Apenas nações em guerra', r.showArmies === 'war')}
+        ${option('all', 'Todos', r.showArmies === 'all')}
+        ${option('none', 'Nenhum (só a nação selecionada)', r.showArmies === 'none')}
       </select></label>`;
     const simOpts = `
-      <label class="col">Agressividade das nações
-        <select class="px-select" data-change="aggression">
-          ${CONFLICT_LEVEL_IDS.map((id) => `<option value="${id}"${s.aggression === id ? ' selected' : ''}>${esc(CONFLICT_LEVELS[id].name)}</option>`).join('')}
+      <label class="${FIELD_LABEL}">Agressividade das nações
+        <select class="${FIELD}" data-change="aggression">
+          ${CONFLICT_LEVEL_IDS.map((id) => option(id, CONFLICT_LEVELS[id].name, s.aggression === id)).join('')}
         </select>
-        <span class="muted" data-out="aggression">${esc(CONFLICT_LEVELS[s.aggression].description)}</span></label>
-      <label><input class="px-check" type="checkbox" data-change="rebellions"${s.rebellions ? ' checked' : ''}> Rebeliões</label>
-      <label><input class="px-check" type="checkbox" data-change="diplomacy"${s.diplomacy ? ' checked' : ''}> Atividade diplomática</label>
-      <div class="muted">Eventos: 50% de chance de acontecer um evento no mundo a cada mês.</div>`;
-    const ui = `
-      <label class="col">Notificações na tela
-        <select class="px-select" data-change="toasts">
-          <option value="3"${p.toastImportance === 3 ? ' selected' : ''}>Apenas marcos históricos</option>
-          <option value="2"${p.toastImportance === 2 ? ' selected' : ''}>Acontecimentos importantes</option>
-          <option value="1"${p.toastImportance === 1 ? ' selected' : ''}>Todos (muito frequente)</option>
+        <span class="${MUTED}" data-out="aggression">${esc(CONFLICT_LEVELS[s.aggression].description)}</span></label>
+      ${checkbox('rebellions', 'Rebeliões', s.rebellions)}
+      ${checkbox('diplomacy', 'Atividade diplomática', s.diplomacy)}
+      ${mutedBlock('Eventos: 50% de chance de acontecer um evento no mundo a cada mês.', 'self-center')}`;
+    const uiOpts = `
+      <label class="${FIELD_LABEL}">Notificações na tela
+        <select class="${FIELD}" data-change="toasts">
+          ${option('3', 'Apenas marcos históricos', p.toastImportance === 3)}
+          ${option('2', 'Acontecimentos importantes', p.toastImportance === 2)}
+          ${option('1', 'Todos (muito frequente)', p.toastImportance === 1)}
         </select></label>
-      <label class="col">Salvamento automático
-        <select class="px-select" data-change="autosave">
-          ${[0, 5, 10, 25, 50].map((v) => `<option value="${v}"${p.autosaveYears === v ? ' selected' : ''}>${v === 0 ? 'Desligado' : `A cada ${v} anos`}</option>`).join('')}
+      <label class="${FIELD_LABEL}">Salvamento automático
+        <select class="${FIELD}" data-change="autosave">
+          ${[0, 5, 10, 25, 50].map((v) => option(String(v), v === 0 ? 'Desligado' : `A cada ${v} anos`, p.autosaveYears === v)).join('')}
         </select></label>
-      <label><input class="px-check" type="checkbox" data-change="pausewar"${p.pauseOnSelectedWar ? ' checked' : ''}> Pausar quando a nação selecionada entrar em guerra</label>`;
+      ${checkbox('pausewar', 'Pausar quando a nação selecionada entrar em guerra', p.pauseOnSelectedWar)}`;
     return (
-      sec('Mapa', 'globe', `<div class="settings-grid">${toggles}${armies}</div>`) +
-      sec('Simulação', 'gear', `<div class="settings-grid">${simOpts}</div>
-        <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input class="px-check" type="checkbox" data-change="autopeace"${s.autoPeace ? ' checked' : ''}> Nações fazem as pazes sozinhas (tratados automáticos)</label>
-        <div class="muted">Desligado: cada guerra continua até um lado dominar o outro ou até você decidir a paz no painel da guerra. As mudanças valem imediatamente para este mundo.</div>`) +
-      sec('Interface', 'info', `<div class="settings-grid">${ui}</div>`) +
-      `<div class="action"><button class="px-btn" data-action="fit">${icon('target', 16)} Enquadrar mapa</button><button class="px-btn" data-close>Fechar</button></div>`
+      section('Mapa', 'globe', `<div class="${GRID}">${toggles}${armies}</div>`) +
+      section(
+        'Simulação',
+        'gear',
+        `<div class="${GRID}">${simOpts}</div><div class="mt-2">${checkbox('autopeace', 'Nações fazem as pazes sozinhas (tratados automáticos)', s.autoPeace)}</div>` +
+          mutedBlock('Desligado: cada guerra continua até um lado dominar o outro ou até você decidir a paz no painel da guerra. As mudanças valem imediatamente para este mundo.'),
+      ) +
+      section('Interface', 'info', `<div class="${GRID}">${uiOpts}</div>`) +
+      actions(button('Enquadrar mapa', { icon: 'target', attrs: 'data-action="fit"' }) + button('Fechar', { attrs: 'data-close' }))
     );
   }
 

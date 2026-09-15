@@ -1,7 +1,6 @@
 // Ajuda: controles e dicas de como observar e intervir no mundo.
-import { icon } from '../dom';
+import { KBD, modalTitle, section } from '../components';
 import type { GameUI } from '../game/GameUI';
-import { sec } from './common';
 import { BasePanel } from './Panel';
 
 export class HelpModal extends BasePanel {
@@ -14,12 +13,12 @@ export class HelpModal extends BasePanel {
   }
 
   protected renderHead(): string {
-    return `${icon('info', 32)}<h2>Como jogar</h2><button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>`;
+    return modalTitle('info', 'Como jogar');
   }
 
   protected renderBody(): string {
-    const k = (s: string) => `<span class="kbd">${s}</span>`;
-    const keys = `<div class="help-keys">
+    const k = (s: string) => `<span class="${KBD}">${s}</span>`;
+    const keys = `<div class="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 text-[13px]">
       <span>${k('Arrastar')}</span><span>Mover o mapa</span>
       <span>${k('Roda')} ${k('+')} ${k('−')}</span><span>Zoom (em degraus de pixel)</span>
       <span>${k('Clique')}</span><span>Selecionar nação, exército ou batalha</span>
@@ -35,7 +34,7 @@ export class HelpModal extends BasePanel {
       <span>${k('Ctrl')}+${k('S')}</span><span>Salvamento rápido</span>
       <span>${k('Esc')}</span><span>Fechar painel / menu</span>
     </div>`;
-    const tips = `<div class="result-line">
+    const tips = `<div class="text-[13px] leading-[1.4] [&_p]:my-2">
       <p>Você é o <b>observador e controlador</b> deste mundo. A simulação avança sozinha: nações recrutam exércitos,
       declaram guerras, cercam cidades, assinam tratados, se rebelam e desaparecem.</p>
       <p>Cada país é dividido em seus <b>estados</b> reais (estados, províncias ou regiões oficiais, conforme o país).
@@ -60,13 +59,12 @@ export class HelpModal extends BasePanel {
       ocupação destroem a infraestrutura dos estados, que produzem menos até serem reconstruídos. Sem crédito, os soldos
       atrasam e os exércitos desertam, e um país pode não ter forças para concluir uma conquista ou sair enfraquecido
       de uma vitória difícil. Veja o modo de mapa <b>Destruição</b> e a seção <b>Economia de guerra</b> de cada nação.</p>
-      <p>
-      Cercos mostram uma barra de progresso; batalhas em andamento pulsam no mapa.</p>
+      <p>Cercos mostram uma barra de progresso; batalhas em andamento pulsam no mapa.</p>
       <p>Na aba <b>Ações</b> de cada nação você pode declarar guerras, forçar a paz, formar alianças, incitar rebeliões,
       mudar governos, conceder exércitos e disparar eventos. Desative a <b>diplomacia autônoma</b> para controlar uma nação sozinho.</p>
       <p>Use os <b>modos de mapa</b> à esquerda para ver terreno, diplomacia, religião, cultura, governo, desenvolvimento,
       densidade, agitação, economia e tecnologia.</p>
     </div>`;
-    return sec('Controles', 'gear', keys) + sec('Dicas', 'book', tips);
+    return section('Controles', 'gear', keys) + section('Dicas', 'book', tips);
   }
 }

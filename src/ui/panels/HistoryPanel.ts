@@ -1,6 +1,7 @@
 // Historico cronologico com filtros por categoria, importancia, nacao selecionada, busca
 // e navegacao por ano. Clique em um registro para ir ate o acontecimento.
 import type { HistoryEntry, HistoryType } from '../../state/types';
+import { actions, btnClass, button, CHECK, closeButton, FIELD, FIELD_GROW, headTitles, mutedBlock } from '../components';
 import { esc, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
 import { historyList } from './common';
@@ -36,8 +37,7 @@ export class HistoryPanel extends BasePanel {
 
   protected renderHead(): string {
     const total = this.sim.state.history.length;
-    return `${icon('book', 36)}<div class="titles"><h2>Histórico</h2><div class="sub">${total.toLocaleString('pt-BR')} registros · ${this.sim.year()}</div></div>
-      <button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>`;
+    return `${icon('book', 36)}${headTitles('Histórico', [`${total.toLocaleString('pt-BR')} registros · ${this.sim.year()}`])}${closeButton()}`;
   }
 
   private filtered(): HistoryEntry[] {
@@ -62,26 +62,22 @@ export class HistoryPanel extends BasePanel {
   protected renderBody(): string {
     const sim = this.sim;
     const sel = this.ui.renderer.selectedCountry;
-    const cats = CATEGORIES.map((c) => `<button class="px-btn${this.enabled.has(c.id) ? ' on' : ''}" data-action="cat" data-cat="${c.id}">${icon(c.icon, 14)} ${esc(c.label)}</button>`).join('');
-    const controls = `
-      <div class="history-filters">${cats}</div>
-      <div class="action" style="margin-bottom:4px">
-        <select class="px-select" data-change="imp">
-          <option value="1"${this.minImportance === 1 ? ' selected' : ''}>Todos os registros</option>
-          <option value="2"${this.minImportance === 2 ? ' selected' : ''}>Acontecimentos importantes</option>
-          <option value="3"${this.minImportance === 3 ? ' selected' : ''}>Marcos históricos</option>
-        </select>
-        <label class="px-btn small"><input class="px-check" type="checkbox" data-change="only"${this.onlySelected ? ' checked' : ''}> ${sel >= 0 ? `Só ${esc(sim.country(sel).name)}` : 'Só nação selecionada'}</label>
-      </div>
-      <div class="action" style="margin-bottom:6px">
-        <input class="px-input" data-change="search" placeholder="Buscar (Enter)" value="${esc(this.search)}">
-        <button class="px-btn small" data-action="year-prev" title="Voltar 10 anos">«</button>
-        <input class="px-input" style="max-width:84px;min-width:70px" type="number" data-change="year" placeholder="Ano" value="${this.year ?? ''}">
-        <button class="px-btn small" data-action="year-next" title="Avançar 10 anos">»</button>
-        <button class="px-btn small" data-action="year-now">Hoje</button>
-      </div>`;
+    const cats = CATEGORIES.map((c) => button(esc(c.label), { size: 'xs', icon: c.icon, iconSize: 14, pressed: this.enabled.has(c.id), attrs: `data-action="cat" data-cat="${c.id}"` })).join('');
+    const importance = `<select class="${FIELD_GROW}" data-change="imp">
+        <option value="1"${this.minImportance === 1 ? ' selected' : ''}>Todos os registros</option>
+        <option value="2"${this.minImportance === 2 ? ' selected' : ''}>Acontecimentos importantes</option>
+        <option value="3"${this.minImportance === 3 ? ' selected' : ''}>Marcos históricos</option>
+      </select>`;
+    const only = `<label class="${btnClass('default', 'sm')}"><input class="${CHECK}" type="checkbox" data-change="only"${this.onlySelected ? ' checked' : ''}>${sel >= 0 ? `Só ${esc(sim.country(sel).name)}` : 'Só nação selecionada'}</label>`;
+    const nav =
+      `<input class="${FIELD_GROW}" data-change="search" placeholder="Buscar (Enter)" value="${esc(this.search)}">` +
+      button('«', { size: 'sm', title: 'Voltar 10 anos', attrs: 'data-action="year-prev"' }) +
+      `<input class="${FIELD} w-[84px]" type="number" data-change="year" placeholder="Ano" value="${this.year ?? ''}">` +
+      button('»', { size: 'sm', title: 'Avançar 10 anos', attrs: 'data-action="year-next"' }) +
+      button('Hoje', { size: 'sm', attrs: 'data-action="year-now"' });
+    const controls = `<div class="mb-1.5 flex flex-wrap gap-[3px]">${cats}</div>${actions(importance + only, 'mb-1')}${actions(nav, 'mb-1.5')}`;
     const entries = this.filtered();
-    const note = entries.length >= LIMIT ? `<div class="muted">Mostrando os ${LIMIT} registros mais recentes${this.year !== null ? ` até ${this.year}` : ''}. Use o filtro de ano para navegar pelo passado.</div>` : '';
+    const note = entries.length >= LIMIT ? mutedBlock(`Mostrando os ${LIMIT} registros mais recentes${this.year !== null ? ` até ${this.year}` : ''}. Use o filtro de ano para navegar pelo passado.`) : '';
     return controls + note + historyList(sim, entries);
   }
 

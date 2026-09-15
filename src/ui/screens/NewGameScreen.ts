@@ -3,9 +3,16 @@ import type { App } from '../../app/App';
 import { fmtInt } from '../../core/format';
 import { ERAS, eraOfYear } from '../../data/eras';
 import { CONFLICT_LEVEL_IDS, CONFLICT_LEVELS, DEFAULT_SETTINGS, type ConflictLevel } from '../../state/types';
+import { btnClass, button, CHECK, FIELD, SCREEN, SCREEN_SECTION, screenBg } from '../components';
 import { el, esc, icon } from '../dom';
 
 const MAP_ORDER = ['world', 'americas', 'europe', 'asia-oceania', 'eurasia', 'africa'];
+
+const MAP_CARD =
+  'cursor-pointer border-[3px] border-edge bg-paper-2 p-1.5 text-left shadow-drop-sm hover:bg-hover aria-pressed:bg-[#f5d98e] aria-pressed:outline-[3px] aria-pressed:outline-offset-[-8px] aria-pressed:outline-red';
+const ERA_LAYOUT = 'flex flex-col items-start gap-0.5 whitespace-normal text-left leading-tight';
+const OPTION = 'flex flex-col gap-1 text-sm';
+const HINT = 'text-xs text-ink-soft';
 
 export class NewGameScreen {
   private node: HTMLElement;
@@ -15,62 +22,68 @@ export class NewGameScreen {
   constructor(root: HTMLElement, private readonly app: App) {
     const maps = [...app.maps].sort((a, b) => MAP_ORDER.indexOf(a.id) - MAP_ORDER.indexOf(b.id));
     if (maps.length && !maps.some((m) => m.id === this.mapId)) this.mapId = maps[0].id;
-    this.node = el('div', 'screen');
+    const mapCards = maps
+      .map(
+        (m, i) => `
+        <button class="${MAP_CARD}" aria-pressed="${m.id === this.mapId}" data-map="${esc(m.id)}">
+          <img class="block aspect-[16/10] w-full border-2 border-edge bg-[#2f4f7a] object-cover" src="maps/${esc(m.id)}/preview.png" alt="">
+          <h3 class="mx-0.5 mt-1.5 mb-0.5 font-pixel text-[17px]">${i + 1}. ${esc(m.name)}</h3>
+          <p class="mx-0.5 mb-1 text-[12.5px] leading-[1.3] text-ink-soft">${esc(m.description)}</p>
+          <div class="mx-0.5 flex gap-2.5 text-xs"><span>${icon('flag', 16)} ${fmtInt(m.nations)} nações</span><span>${icon('pin', 16)} ${fmtInt(m.provinces)} estados</span></div>
+        </button>`,
+      )
+      .join('');
+    const eraCards = ERAS.map(
+      (e) =>
+        `<button class="${btnClass('default', 'card', ERA_LAYOUT)}" aria-pressed="${e.id === this.eraId}" data-era="${e.id}">${e.year} — ${esc(e.name)} · ${esc(eraOfYear(e.year).name)}<small class="block font-sans text-[11px] font-normal leading-[1.2] text-ink-soft">${esc(e.description)}</small></button>`,
+    ).join('');
+    const check = (attr: string, label: string, checked: boolean) => `<span class="flex items-center gap-2"><input class="${CHECK}" type="checkbox" ${attr}${checked ? ' checked' : ''}>${label}</span>`;
+    this.node = el('div', SCREEN);
     this.node.innerHTML = `
-      <div class="screen-bg" style="background-image:url('maps/world/preview.png')"></div>
-      <div class="px-panel newgame">
-        <header>
-          ${icon('globe', 32)}<h1>Novo Jogo</h1>
-          <button class="px-btn" data-act="back">${icon('close', 16)} Voltar</button>
+      ${screenBg('maps/world/preview.png')}
+      <div class="parchment relative flex max-h-[calc(100vh-24px)] w-[min(1180px,calc(100vw-24px))] flex-col">
+        <header class="flex items-center gap-3 px-[18px] pt-3.5 pb-2">
+          ${icon('globe', 32)}<h1 class="flex-1 font-pixel text-[28px]">Novo Jogo</h1>
+          ${button('Voltar', { icon: 'close', attrs: 'data-act="back"' })}
         </header>
-        <div class="content">
-          <div class="section-title">${icon('pin', 16)} Escolha o mapa</div>
-          <div class="map-grid">
-            ${maps.map((m, i) => `
-              <button class="map-card${m.id === this.mapId ? ' on' : ''}" data-map="${esc(m.id)}">
-                <img src="maps/${esc(m.id)}/preview.png" alt="">
-                <h3>${i + 1}. ${esc(m.name)}</h3>
-                <p>${esc(m.description)}</p>
-                <div class="meta"><span>${icon('flag', 16)} ${fmtInt(m.nations)} nações</span><span>${icon('pin', 16)} ${fmtInt(m.provinces)} estados</span></div>
-              </button>`).join('')}
-          </div>
-          <div class="section-title">${icon('book', 16)} Ano inicial</div>
-          <div class="era-list">
-            ${ERAS.map((e) => `<button class="px-btn${e.id === this.eraId ? ' on' : ''}" data-era="${e.id}">${e.year} — ${esc(e.name)} · ${esc(eraOfYear(e.year).name)}<small>${esc(e.description)}</small></button>`).join('')}
-          </div>
-          <div class="hint">A era é definida pelo ano da simulação. As tecnologias surgem uma a uma, nas suas datas históricas, e cada país precisa descobri-las, comprá-las, licenciá-las, roubá-las ou desenvolvê-las.</div>
-          <div class="section-title">${icon('gear', 16)} Parâmetros</div>
-          <div class="opt-grid">
-            <label>Semente do mundo
-              <span style="display:flex;gap:6px"><input class="px-input" data-seed type="number" value="${Math.floor(Math.random() * 1e6)}" style="flex:1"><button class="px-btn small" data-act="dice">Sortear</button></span>
-              <span class="hint">A mesma semente gera a mesma história inicial.</span>
+        <div class="overflow-y-auto px-[18px] pt-1 pb-3.5" data-ui="newgame-content">
+          <div class="${SCREEN_SECTION}">${icon('pin', 16)} Escolha o mapa</div>
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-3">${mapCards}</div>
+          <div class="${SCREEN_SECTION}">${icon('book', 16)} Ano inicial</div>
+          <div class="mt-2 grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-2">${eraCards}</div>
+          <div class="mt-1 ${HINT}">A era é definida pelo ano da simulação. As tecnologias surgem uma a uma, nas suas datas históricas, e cada país precisa descobri-las, comprá-las, licenciá-las, roubá-las ou desenvolvê-las.</div>
+          <div class="${SCREEN_SECTION}">${icon('gear', 16)} Parâmetros</div>
+          <div class="mt-4 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3.5">
+            <label class="${OPTION}">Semente do mundo
+              <span class="flex gap-1.5"><input class="${FIELD} flex-1" data-seed type="number" value="${Math.floor(Math.random() * 1e6)}">${button('Sortear', { size: 'sm', attrs: 'data-act="dice"' })}</span>
+              <span class="${HINT}">A mesma semente gera a mesma história inicial.</span>
             </label>
-            <label>Agressividade das nações
-              <select class="px-select" data-aggression>
+            <label class="${OPTION}">Agressividade das nações
+              <select class="${FIELD}" data-aggression>
                 ${CONFLICT_LEVEL_IDS.map((id) => `<option value="${id}"${id === DEFAULT_SETTINGS.aggression ? ' selected' : ''}>${esc(CONFLICT_LEVELS[id].name)}</option>`).join('')}
               </select>
-              <span class="hint" data-out="aggression">${esc(CONFLICT_LEVELS[DEFAULT_SETTINGS.aggression].description)}</span>
+              <span class="${HINT}" data-out="aggression">${esc(CONFLICT_LEVELS[DEFAULT_SETTINGS.aggression].description)}</span>
             </label>
-            <label>Rebeliões
-              <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-rebellions checked> Ligadas</span>
-              <span class="hint">Revoltas, revoluções, guerras civis e lutas de vassalos pela independência.</span>
+            <label class="${OPTION}">Rebeliões
+              ${check('data-rebellions', 'Ligadas', true)}
+              <span class="${HINT}">Revoltas, revoluções, guerras civis e lutas de vassalos pela independência.</span>
             </label>
-            <label>Atividade diplomática
-              <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-diplomacy checked> Ligada</span>
-              <span class="hint">As nações formam alianças, pactos, comércio, garantias, sanções e coalizões por conta própria.</span>
+            <label class="${OPTION}">Atividade diplomática
+              ${check('data-diplomacy', 'Ligada', true)}
+              <span class="${HINT}">As nações formam alianças, pactos, comércio, garantias, sanções e coalizões por conta própria.</span>
             </label>
-            <label>Eventos
-              <span class="hint">50% de chance de acontecer um evento no mundo a cada mês.</span>
+            <label class="${OPTION}">Eventos
+              <span class="${HINT}">50% de chance de acontecer um evento no mundo a cada mês.</span>
             </label>
-            <label>Fim das guerras
-              <span style="display:flex;gap:8px;align-items:center"><input class="px-check" type="checkbox" data-autopeace> Nações fazem as pazes sozinhas</span>
-              <span class="hint">Desligado (padrão): a guerra só termina quando um lado domina o outro ou quando você decide a paz.</span>
+            <label class="${OPTION}">Fim das guerras
+              ${check('data-autopeace', 'Nações fazem as pazes sozinhas', false)}
+              <span class="${HINT}">Desligado (padrão): a guerra só termina quando um lado domina o outro ou quando você decide a paz.</span>
             </label>
           </div>
         </div>
-        <footer>
-          <button class="px-btn" data-act="back">Cancelar</button>
-          <button class="px-btn primary" data-act="start">${icon('play', 20)} Iniciar simulação</button>
+        <footer class="flex justify-end gap-2.5 border-t-2 border-dashed border-paper-dark px-[18px] pt-2.5 pb-4">
+          ${button('Cancelar', { attrs: 'data-act="back"' })}
+          ${button('Iniciar simulação', { tone: 'primary', icon: 'play', iconSize: 20, attrs: 'data-act="start"' })}
         </footer>
       </div>`;
     root.appendChild(this.node);
@@ -88,10 +101,10 @@ export class NewGameScreen {
     if (!target) return;
     if (target.dataset.map) {
       this.mapId = target.dataset.map;
-      this.node.querySelectorAll('[data-map]').forEach((n) => n.classList.toggle('on', (n as HTMLElement).dataset.map === this.mapId));
+      this.node.querySelectorAll<HTMLElement>('[data-map]').forEach((n) => n.setAttribute('aria-pressed', String(n.dataset.map === this.mapId)));
     } else if (target.dataset.era) {
       this.eraId = target.dataset.era;
-      this.node.querySelectorAll('[data-era]').forEach((n) => n.classList.toggle('on', (n as HTMLElement).dataset.era === this.eraId));
+      this.node.querySelectorAll<HTMLElement>('[data-era]').forEach((n) => n.setAttribute('aria-pressed', String(n.dataset.era === this.eraId)));
     } else if (target.dataset.act === 'back') {
       this.app.menu();
     } else if (target.dataset.act === 'dice') {

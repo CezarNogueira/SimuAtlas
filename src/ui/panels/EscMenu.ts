@@ -1,5 +1,5 @@
 // Menu do jogo (Esc): pausa a simulacao enquanto aberto.
-import { icon } from '../dom';
+import { button, modalTitle, type Tone } from '../components';
 import type { GameUI } from '../game/GameUI';
 import { BasePanel } from './Panel';
 
@@ -11,7 +11,6 @@ export class EscMenu extends BasePanel {
     super(ui, 'modal narrow');
     this.wasPaused = ui.loop.paused;
     ui.loop.paused = true;
-    this.box.classList.add('escmenu');
   }
 
   protected isStatic(): boolean {
@@ -19,18 +18,19 @@ export class EscMenu extends BasePanel {
   }
 
   protected renderHead(): string {
-    return `${icon('castle', 32)}<h2>Atlas Vivo</h2><button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>`;
+    return modalTitle('castle', 'Atlas Vivo');
   }
 
   protected renderBody(): string {
-    return `<div class="menu-buttons">
-      <button class="px-btn primary" data-action="resume">${icon('play', 20)} Continuar</button>
-      <button class="px-btn" data-action="save">${icon('save', 20)} Salvar jogo</button>
-      <button class="px-btn" data-action="load">${icon('folder', 20)} Carregar jogo</button>
-      <button class="px-btn" data-action="stats">${icon('chart', 20)} Estatísticas</button>
-      <button class="px-btn" data-action="settings">${icon('gear', 20)} Configurações</button>
-      <button class="px-btn" data-action="help">${icon('info', 20)} Como jogar</button>
-      <button class="px-btn danger" data-action="exit">${icon('globe', 20)} Sair para o menu principal</button>
+    const item = (action: string, label: string, iconName: string, tone: Tone = 'default') => button(label, { tone, size: 'menu', icon: iconName, iconSize: 20, attrs: `data-action="${action}"` });
+    return `<div class="flex flex-col gap-2.5">
+      ${item('resume', 'Continuar', 'play', 'primary')}
+      ${item('save', 'Salvar jogo', 'save')}
+      ${item('load', 'Carregar jogo', 'folder')}
+      ${item('stats', 'Estatísticas', 'chart')}
+      ${item('settings', 'Configurações', 'gear')}
+      ${item('help', 'Como jogar', 'info')}
+      ${item('exit', 'Sair para o menu principal', 'globe', 'danger')}
     </div>`;
   }
 

@@ -58,7 +58,7 @@ try {
 
   const t0 = Date.now();
   await page.click('[data-act="start"]');
-  await page.waitForSelector('canvas.map', { timeout: 120000 });
+  await page.waitForSelector('canvas[data-ui="map"]', { timeout: 120000 });
   log(`jogo carregado em ${Date.now() - t0} ms`);
   await sleep(2500);
   await shot('03-game-start');
@@ -81,9 +81,9 @@ try {
     // O clique caiu no mar: seleciona a maior nacao pelo ranking das estatisticas.
     log('clique no mapa sem nação; usando o ranking');
     await page.keyboard.press('e');
-    await page.waitForSelector('.rank-card li[data-country]', { visible: true, timeout: 5000 });
+    await page.waitForSelector('[data-ui="rank-card"] li[data-country]', { visible: true, timeout: 5000 });
     await sleep(400);
-    await page.click('.rank-card li[data-country]');
+    await page.click('[data-ui="rank-card"] li[data-country]');
     await sleep(300);
     await page.keyboard.press('Escape');
     await sleep(900);
@@ -113,7 +113,7 @@ try {
   // Lista de guerras e painel de uma guerra (regras de fim da guerra).
   await page.keyboard.press('g');
   await sleep(800);
-  if (await clickIf('.side.left [data-war]')) {
+  if (await clickIf('[data-panel="left"] [data-war]')) {
     await sleep(1000);
     await shot('07b-war-panel');
     await page.keyboard.press('Escape');
@@ -125,10 +125,10 @@ try {
   await page.keyboard.press('t');
   await sleep(900);
   await shot('07c-tech-list');
-  if (await clickIf('.side.left .row.link[data-tech]')) {
+  if (await clickIf('[data-panel="left"] [data-tech]')) {
     await sleep(1000);
     await shot('07d-tech-panel');
-    if (await clickIf('.side.right [data-tab="historico"]')) {
+    if (await clickIf('[data-panel="right"] [data-tab="historico"]')) {
       await sleep(600);
       await shot('07e-tech-history');
     }
@@ -145,21 +145,21 @@ try {
   }
   await page.keyboard.press('Escape');
 
-  await clickIf('.bottombar [data-act="save"]');
+  await clickIf('[data-ui="bottombar"] [data-act="save"]');
   await page.waitForSelector('[data-action="save-new"]', { visible: true, timeout: 5000 });
   await sleep(500);
   await page.click('[data-action="save-new"]');
   await sleep(2500);
-  const rows = await page.$$eval('.save-row', (els) => els.length);
+  const rows = await page.$$eval('[data-ui="save-row"]', (els) => els.length);
   log(`saves listados após salvar: ${rows}`);
   await shot('09-saved');
   await page.keyboard.press('Escape');
 
-  await clickIf('.bottombar [data-act="load"]');
+  await clickIf('[data-ui="bottombar"] [data-act="load"]');
   await sleep(1500);
   await shot('10-load');
   if (await clickIf('[data-load]')) {
-    await page.waitForSelector('canvas.map', { timeout: 60000 });
+    await page.waitForSelector('canvas[data-ui="map"]', { timeout: 60000 });
     await sleep(2500);
     const date = await page.evaluate(() => document.querySelector('[data-part="date"]')?.textContent);
     log(`jogo recarregado na data ${date}`);

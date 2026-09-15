@@ -142,7 +142,8 @@ export class MapRenderer {
     const ctx = this.selectionCtx;
     ctx.clearRect(0, 0, W, m.height);
     if (sel < 0) return;
-    const img = ctx.getImageData(0, 0, W, m.height);
+    // A camada acabou de ser limpa: comeca de uma imagem transparente sem ler os pixels de volta da GPU.
+    const img = ctx.createImageData(W, m.height);
     const d = img.data;
     for (const p of this.sim.index.ownedBy[sel] ?? []) {
       for (let k = m.cellStart[p]; k < m.cellStart[p + 1]; k++) {

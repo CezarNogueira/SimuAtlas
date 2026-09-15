@@ -1,9 +1,10 @@
-// Trechos de interface reutilizados pelos paineis: links de entidades, secoes, status de exercitos.
+// Trechos de interface reutilizados pelos paineis: links de entidades, historico, tecnologias e exercitos.
 import { formatDate } from '../../core/calendar';
 import type { Technology } from '../../data/technologies';
 import type { Simulation } from '../../sim/Simulation';
 import { STATUS_LABELS, type TechStatus } from '../../sim/technology/TechnologyEngine';
 import type { Army, HistoryEntry, HistoryType, War } from '../../state/types';
+import { empty, LINK } from '../components';
 import { esc, flagInline, icon } from '../dom';
 
 export const HISTORY_ICONS: Record<HistoryType, string> = {
@@ -41,27 +42,27 @@ export const HISTORY_ICONS: Record<HistoryType, string> = {
 export function cLink(sim: Simulation, id: number): string {
   const c = sim.country(id);
   if (!c) return '—';
-  return `<span class="lnk" data-country="${id}">${flagInline(c, 18)}${esc(c.name)}</span>`;
+  return `<span class="${LINK}" data-country="${id}">${flagInline(c, 18, 'mr-1')}${esc(c.name)}</span>`;
 }
 
 export function pLink(sim: Simulation, pid: number): string {
   const mp = sim.map.provinces[pid];
-  return mp ? `<span class="lnk" data-province="${pid}">${esc(mp.name)}</span>` : '—';
+  return mp ? `<span class="${LINK}" data-province="${pid}">${esc(mp.name)}</span>` : '—';
 }
 
 export function warLink(w: War): string {
-  return `<span class="lnk" data-war="${w.id}">${esc(w.name)}</span>`;
+  return `<span class="${LINK}" data-war="${w.id}">${esc(w.name)}</span>`;
 }
 
 export function techLink(sim: Simulation, id: string): string {
   const t = sim.technology.db.get(id);
-  return t ? `<span class="lnk" data-tech="${esc(id)}">${esc(t.nome)}</span>` : esc(id);
+  return t ? `<span class="${LINK}" data-tech="${esc(id)}">${esc(t.nome)}</span>` : esc(id);
 }
 
 // Marcador de situacao: verde = dominada, amarelo = em desenvolvimento, vermelho = nao disponivel.
 export function techDot(status: TechStatus): string {
-  const cls = status === 'dominada' ? 'green' : status === 'desenvolvimento' ? 'yellow' : 'red';
-  return `<i class="tdot ${cls}" title="${STATUS_LABELS[status]}"></i>`;
+  const color = status === 'dominada' ? 'bg-[#5aa33f]' : status === 'desenvolvimento' ? 'bg-[#e0b12e]' : 'bg-[#c2452f]';
+  return `<i class="mr-0.5 inline-block size-2.5 shrink-0 border-2 border-edge align-middle ${color}" title="${STATUS_LABELS[status]}"></i>`;
 }
 
 // Situacao da tecnologia no mundo: descoberta, possivel mas ainda nao descoberta, ou antes da data historica.
@@ -72,14 +73,6 @@ export function worldTechStatus(sim: Simulation, t: Technology): TechStatus {
 
 export const dateOf = (sim: Simulation, day: number) => formatDate(day, sim.state.startYear);
 
-export function sec(title: string, iconName: string, content: string): string {
-  return `<div class="sec"><h3>${icon(iconName, 16)} ${esc(title)}</h3>${content}</div>`;
-}
-
-export function kvGrid(rows: string[]): string {
-  return `<div class="kv">${rows.join('')}</div>`;
-}
-
 export function navAttr(e: HistoryEntry): string {
   if (e.battle >= 0) return `data-battle="${e.battle}"`;
   if (e.war >= 0) return `data-war="${e.war}"`;
@@ -88,23 +81,30 @@ export function navAttr(e: HistoryEntry): string {
   return '';
 }
 
+// Registro de uma linha do tempo (historico do mundo, da nacao ou de uma tecnologia).
+export function timelineEntry(iconName: string, when: string, text: string, importance: number, nav = ''): string {
+  return `<div class="grid cursor-pointer grid-cols-[20px_44px_1fr] gap-1.5 border-b border-dashed border-paper-dark px-0.5 py-1 text-[12.5px] leading-[1.3] hover:bg-paper-2${importance >= 3 ? ' font-bold' : ''}" ${nav}>${icon(iconName, 16)}<span class="text-ink-soft">${when}</span><span>${text}</span></div>`;
+}
+
+export const TIMELINE = 'flex flex-col';
+
 export function historyRow(sim: Simulation, e: HistoryEntry): string {
-  return `<div class="history-entry imp${e.importance}" ${navAttr(e)}>${icon(HISTORY_ICONS[e.type] ?? 'info', 16)}<span class="when">${dateOf(sim, e.day).slice(0, 5)}</span><span>${esc(e.text)}</span></div>`;
+  return timelineEntry(HISTORY_ICONS[e.type] ?? 'info', dateOf(sim, e.day).slice(0, 5), esc(e.text), e.importance, navAttr(e));
 }
 
 export function historyList(sim: Simulation, entries: HistoryEntry[]): string {
-  if (!entries.length) return '<div class="empty">Nenhum acontecimento registrado.</div>';
+  if (!entries.length) return empty('Nenhum acontecimento registrado.');
   let year = -1;
   let html = '';
   for (const e of entries) {
     const y = sim.year(e.day);
     if (y !== year) {
       year = y;
-      html += `<div class="history-year">${y}</div>`;
+      html += `<div class="sticky -top-1 z-[1] mt-1.5 border-2 border-edge bg-paper-3 px-2 py-px font-pixel font-bold">${y}</div>`;
     }
     html += historyRow(sim, e);
   }
-  return `<div class="history-list">${html}</div>`;
+  return `<div class="${TIMELINE}">${html}</div>`;
 }
 
 export function armyStatus(sim: Simulation, a: Army): string {

@@ -73,7 +73,7 @@ export class InputController {
     if (this.down) {
       if (!this.dragging && Math.hypot(x - this.down.x, y - this.down.y) > 4) {
         this.dragging = true;
-        this.screen.canvas.classList.add('dragging');
+        this.screen.canvas.dataset.dragging = 'true';
         this.screen.ui.hideTooltip();
       }
       if (this.dragging) {
@@ -100,7 +100,7 @@ export class InputController {
     }
     this.down = null;
     this.dragging = false;
-    this.screen.canvas.classList.remove('dragging');
+    this.screen.canvas.dataset.dragging = 'false';
   }
 
   private onWheel(ev: WheelEvent): void {

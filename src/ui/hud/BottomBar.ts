@@ -1,34 +1,39 @@
 // Barra inferior: controle de tempo (pausa, play, avancar e velocidades) e atalhos dos paineis.
 import { DAYS_PER_SECOND_1X, SPEEDS } from '../../app/GameLoop';
+import { button } from '../components';
 import { el, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
+
+const GROUP = 'flex flex-wrap items-center gap-1';
 
 export class BottomBar {
   readonly node: HTMLElement;
   private lastReal = '';
 
   constructor(private readonly ui: GameUI) {
-    this.node = el('div', 'px-panel bottombar');
+    this.node = el('div', 'parchment absolute right-2 bottom-2 left-2 flex min-h-14 flex-wrap items-center gap-1.5 px-2.5 py-1.5 font-pixel');
+    this.node.dataset.ui = 'bottombar';
+    const panel = (act: string, label: string, iconName: string, title?: string) => button(label, { icon: iconName, iconSize: 18, title, attrs: `data-act="${act}"` });
     this.node.innerHTML = `
-      <div class="group">
-        <button class="px-btn square" data-act="pause" title="Pausar (Espaço)">${icon('pause', 20)}</button>
-        <button class="px-btn square" data-act="play" title="Continuar">${icon('play', 20)}</button>
-        <button class="px-btn square" data-act="ff" title="Acelerar">${icon('ff', 20)}</button>
+      <div class="${GROUP}">
+        ${button(icon('pause', 20), { size: 'icon', title: 'Pausar (Espaço)', pressed: false, attrs: 'data-act="pause"' })}
+        ${button(icon('play', 20), { size: 'icon', title: 'Continuar', pressed: false, attrs: 'data-act="play"' })}
+        ${button(icon('ff', 20), { size: 'icon', title: 'Acelerar', attrs: 'data-act="ff"' })}
       </div>
-      <span class="sep"></span>
-      <div class="group">
-        ${SPEEDS.map((s, i) => `<button class="px-btn speed-btn" data-speed="${s}" title="Tecla ${i + 1} · ${s * DAYS_PER_SECOND_1X} dias por segundo">${s}x</button>`).join('')}
+      <span class="mx-1 w-0.5 self-stretch bg-paper-dark"></span>
+      <div class="${GROUP}">
+        ${SPEEDS.map((s, i) => button(`${s}x`, { size: 'speed', title: `Tecla ${i + 1} · ${s * DAYS_PER_SECOND_1X} dias por segundo`, pressed: false, attrs: `data-speed="${s}"` })).join('')}
       </div>
-      <span class="real-speed" data-real></span>
-      <span class="grow"></span>
-      <div class="group">
-        <button class="px-btn" data-act="history" title="Histórico (H)">${icon('book', 18)} Histórico</button>
-        <button class="px-btn" data-act="wars" title="Guerras (G)">${icon('swords', 18)} Guerras</button>
-        <button class="px-btn" data-act="techs" title="Tecnologias (T)">${icon('gear', 18)} Tecnologia</button>
-        <button class="px-btn" data-act="stats" title="Estatísticas (E)">${icon('chart', 18)} Estatísticas</button>
-        <button class="px-btn" data-act="settings">${icon('gear', 18)} Configurações</button>
-        <button class="px-btn" data-act="save" title="Salvar (Ctrl+S)">${icon('save', 18)} Salvar</button>
-        <button class="px-btn" data-act="load">${icon('folder', 18)} Carregar</button>
+      <span class="min-w-[90px] text-xs text-ink-soft" data-real></span>
+      <span class="flex-1"></span>
+      <div class="${GROUP}">
+        ${panel('history', 'Histórico', 'book', 'Histórico (H)')}
+        ${panel('wars', 'Guerras', 'swords', 'Guerras (G)')}
+        ${panel('techs', 'Tecnologia', 'gear', 'Tecnologias (T)')}
+        ${panel('stats', 'Estatísticas', 'chart', 'Estatísticas (E)')}
+        ${panel('settings', 'Configurações', 'gear')}
+        ${panel('save', 'Salvar', 'save', 'Salvar (Ctrl+S)')}
+        ${panel('load', 'Carregar', 'folder')}
       </div>`;
     ui.layer.appendChild(this.node);
     this.node.addEventListener('click', (ev) => {
@@ -62,9 +67,9 @@ export class BottomBar {
 
   update(): void {
     const loop = this.ui.loop;
-    this.node.querySelector('[data-act="pause"]')?.classList.toggle('on', loop.paused);
-    this.node.querySelector('[data-act="play"]')?.classList.toggle('on', !loop.paused);
-    this.node.querySelectorAll<HTMLElement>('[data-speed]').forEach((b) => b.classList.toggle('on', !loop.paused && Number(b.dataset.speed) === loop.speed));
+    this.node.querySelector('[data-act="pause"]')?.setAttribute('aria-pressed', String(loop.paused));
+    this.node.querySelector('[data-act="play"]')?.setAttribute('aria-pressed', String(!loop.paused));
+    this.node.querySelectorAll<HTMLElement>('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(!loop.paused && Number(b.dataset.speed) === loop.speed)));
     const real = loop.paused ? 'pausado' : `≈ ${Math.round(loop.actualDaysPerSecond)} dias/s`;
     if (real !== this.lastReal) {
       this.lastReal = real;

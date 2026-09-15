@@ -5,6 +5,7 @@ import { iconUrl } from '../render/sprites/icons';
 import { createWorld, normalizeSettings, SAVE_VERSION, type NewGameOptions } from '../sim/createWorld';
 import { Simulation } from '../sim/Simulation';
 import type { GameState } from '../state/types';
+import { button, SCREEN } from '../ui/components';
 import { el, esc, icon, nextFrame } from '../ui/dom';
 import { GameScreen } from '../ui/game/GameScreen';
 import { LoadScreen } from '../ui/screens/LoadScreen';
@@ -33,6 +34,8 @@ export class App {
         document.fonts.load('16px "Pixelify Sans"'),
         document.fonts.load('600 16px "Pixelify Sans"'),
         document.fonts.load('40px "Jacquarda Bastarda 9"'),
+        document.fonts.load('13px "Open Sans"'),
+        document.fonts.load('600 13px "Open Sans"'),
       ]),
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]).catch(() => undefined);
@@ -53,14 +56,16 @@ export class App {
   }
 
   loading(message: string): void {
-    const node = el('div', 'screen loading', `<img class="spinner px-icon" src="${iconUrl('castle')}" alt=""><div class="msg">${esc(message)}</div>`);
+    const node = el('div', `${SCREEN} flex-col gap-[18px] text-paper`, `<img class="pixelated size-16 animate-bob" src="${iconUrl('castle')}" alt=""><div class="font-pixel text-xl tracking-[1px]">${esc(message)}</div>`);
     this.swap(null, node);
   }
 
   error(message: string, err?: unknown): void {
     console.error(err);
-    const node = el('div', 'screen');
-    node.innerHTML = `<div class="px-panel menu-box"><h2>${icon('skull', 32)} Ops!</h2><p>${esc(message)}</p><button class="px-btn" data-back>Voltar ao menu</button></div>`;
+    const node = el('div', SCREEN);
+    node.innerHTML = `<div class="parchment relative w-[min(520px,calc(100vw-32px))] px-[30px] pt-7 pb-6 text-center">
+      <h2 class="mb-2 flex items-center justify-center gap-2 font-pixel text-2xl">${icon('skull', 32)} Ops!</h2>
+      <p class="mb-4 text-sm">${esc(message)}</p>${button('Voltar ao menu', { attrs: 'data-back' })}</div>`;
     node.querySelector('[data-back]')?.addEventListener('click', () => this.menu());
     this.swap(null, node);
   }

@@ -20,8 +20,9 @@ export class GameScreen {
   private readonly offYear: () => void;
 
   constructor(root: HTMLElement, readonly app: App, readonly map: MapData, readonly sim: Simulation) {
-    this.node = el('div', 'game');
-    this.canvas = el('canvas', 'map');
+    this.node = el('div', 'fixed inset-0 overflow-hidden');
+    this.canvas = el('canvas', 'absolute inset-0 block cursor-grab data-[dragging=true]:cursor-grabbing');
+    this.canvas.dataset.ui = 'map';
     this.node.appendChild(this.canvas);
     root.appendChild(this.node);
     this.renderer = new MapRenderer(this.canvas, map, sim, map.projection, map.transform);

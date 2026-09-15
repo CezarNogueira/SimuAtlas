@@ -6,9 +6,36 @@ import { RESOURCES } from '../../data/resources';
 import { terrainInfo } from '../../data/terrain';
 import { DEVASTATION_OUTPUT_LOSS } from '../../sim/engines/EconomyEngine';
 import { soldiersOf } from '../../sim/engines/MilitaryEngine';
-import { bar, esc, icon, kv } from '../dom';
+import {
+  actions,
+  bar,
+  barRow,
+  button,
+  closeButton,
+  COLORS,
+  FIELD_GROW,
+  focusButton,
+  grow,
+  headButtons,
+  headTitles,
+  kv,
+  kvFull,
+  kvGrid,
+  kvList,
+  muted,
+  mutedBlock,
+  num,
+  row,
+  rows,
+  section,
+  stack,
+  sub,
+  table,
+  td,
+} from '../components';
+import { esc, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
-import { armyStatus, cLink, countryOptions, dateOf, kvGrid, pLink, sec } from './common';
+import { armyStatus, cLink, countryOptions, dateOf, pLink } from './common';
 import { BasePanel } from './Panel';
 
 export class ProvincePanel extends BasePanel {
@@ -22,7 +49,7 @@ export class ProvincePanel extends BasePanel {
     this.ui.closeRight();
   }
 
-  // Sem paz automatica, ocupacao por nacao inimiga vira anexacao apos um ano.
+  // Sem paz automatica, ocupacao por nacao inimiga vira anexacao apos dois anos.
   private annexNote(): string {
     const sim = this.sim;
     const ps = sim.state.provinces[this.id];
@@ -35,15 +62,8 @@ export class ProvincePanel extends BasePanel {
     const sim = this.sim;
     const mp = sim.map.provinces[this.id];
     const ps = sim.state.provinces[this.id];
-    return `${icon('pin', 40)}
-      <div class="titles">
-        <h2>${esc(mp.name)}</h2>
-        <div class="sub">${cLink(sim, ps.owner)} · ${esc(terrainInfo(mp.terrain).name)}${sim.provinces.isCapital(this.id) ? ' · capital nacional' : ''}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>
-        <button class="px-btn square" data-action="focus" title="Centralizar">${icon('target', 16)}</button>
-      </div>`;
+    const subtitle = `${cLink(sim, ps.owner)} · ${esc(terrainInfo(mp.terrain).name)}${sim.provinces.isCapital(this.id) ? ' · capital nacional' : ''}`;
+    return `${icon('pin', 40)}${headTitles(esc(mp.name), [subtitle])}${headButtons(closeButton() + focusButton('Centralizar'))}`;
   }
 
   protected renderBody(): string {
@@ -56,43 +76,52 @@ export class ProvincePanel extends BasePanel {
     const output = owner ? sim.economy.provinceOutput(this.id, owner) : 0;
     const dados = kvGrid([
       kv('flag', 'Dono', cLink(sim, ps.owner)),
-      kv('swords', 'Controle', occupied ? `${cLink(sim, ps.controller)} <span class="muted">desde ${dateOf(sim, ps.occupiedSince)}${this.annexNote()}</span>` : 'Próprio'),
-      kv('crown', 'Núcleos', ps.cores.map((c) => cLink(sim, c)).join(', ') || '—'),
+      kv('swords', 'Controle', occupied ? `${cLink(sim, ps.controller)}${sub(`desde ${dateOf(sim, ps.occupiedSince)}${this.annexNote()}`)}` : 'Próprio'),
+      kvList('crown', 'Núcleos', ps.cores.map((c) => cLink(sim, c)), '—'),
       kv('house', 'Cidade principal', esc(sim.provinces.cityName(this.id))),
       kv('people', 'População', fmtInt(ps.population)),
       kv('pin', 'Área', fmtArea(mp.area)),
       kv('building', 'Desenvolvimento', ps.development.toFixed(1)),
       kv('coins', 'Produção mensal', fmtMoney(output)),
       kv('coins', 'Recurso', esc(RESOURCES[ps.resource].name)),
-      kv('mountain', 'Terreno', `${esc(t.name)} <span class="muted">(defesa ×${t.defense.toFixed(2)})</span>`),
-      kv('info', 'Efeitos do terreno', `<span style="white-space:normal">${esc(t.effects || '—')}</span>`),
+      kv('mountain', 'Terreno', `${esc(t.name)}${sub(`defesa ×${t.defense.toFixed(2)}`)}`),
+      kv('info', 'Efeitos do terreno', ''),
+      kvFull(`<span class="text-[12.5px]">${esc(t.effects || '—')}</span>`),
       kv('castle', 'Fortificação', `Nível ${ps.fort}`),
       kv('fire', 'Agitação', `${Math.round(ps.unrest)}%`),
-      `<span></span><div class="full">${bar(ps.unrest / 100, 'var(--red-2)')}</div>`,
-      kv('skull', 'Destruição', `${Math.round(ps.devastation * 100)}%${ps.devastation >= 0.01 ? ` <span class="muted">· produção −${Math.round(ps.devastation * DEVASTATION_OUTPUT_LOSS * 100)}%</span>` : ''}`),
+      barRow(ps.unrest / 100, COLORS.red),
+      kv('skull', 'Destruição', `${Math.round(ps.devastation * 100)}%${ps.devastation >= 0.01 ? sub(`produção −${Math.round(ps.devastation * DEVASTATION_OUTPUT_LOSS * 100)}%`) : ''}`),
       kv('people', 'Cultura', esc(CULTURES[ps.culture].name)),
       kv('temple', 'Religião', esc(RELIGIONS[ps.religion].name)),
       kv('anchor', 'Geografia', [mp.coast > 0 ? 'costeira' : 'interior', mp.river > 0 ? 'com rio' : '', mp.island ? 'ilha' : ''].filter(Boolean).join(', ')),
-      ps.epidemic > 0 ? kv('skull', 'Epidemia', `ativa (${Math.ceil(ps.epidemic / 30)} meses)`) : '',
+      ps.epidemic > 0 ? kv('skull', 'Epidemia', `ativa${sub(`${Math.ceil(ps.epidemic / 30)} meses`)}`) : '',
     ]);
+    const siegePct = ps.siege ? Math.min(100, Math.round((ps.siege.progress / ps.siege.needed) * 100)) : 0;
     const siege = ps.siege
-      ? sec('Cerco', 'castle', `<div class="row"><span class="grow">${esc(sim.provinces.cityName(this.id))} cercada por ${cLink(sim, ps.siege.country)}</span><span class="num">${Math.min(100, Math.round((ps.siege.progress / ps.siege.needed) * 100))}%</span></div>${bar(ps.siege.progress / ps.siege.needed, 'var(--gold)')}<div class="muted">Iniciado em ${dateOf(sim, ps.siege.start)} · guarnição ≈ ${fmtCompact(sim.military.garrison(this.id))}</div>`)
+      ? section(
+          'Cerco',
+          'castle',
+          row(`${stack(`${esc(sim.provinces.cityName(this.id))} cercada por ${cLink(sim, ps.siege.country)}`)}${num(`${siegePct}%`)}`, { top: true }) +
+            bar(ps.siege.progress / ps.siege.needed, COLORS.gold) +
+            mutedBlock(`Iniciado em ${dateOf(sim, ps.siege.start)} · guarnição ≈ ${fmtCompact(sim.military.garrison(this.id))}`, 'mt-0.5'),
+        )
       : '';
     const cities = sim.cities.provinceCities(this.id);
-    const cityTable = `<table class="mini-table"><tr><th>Cidade</th><th class="num">Pop.</th><th class="num">Import.</th><th class="num">Infra.</th><th class="num">Produção</th><th class="num">Estrat.</th></tr>${cities
-      .map((c) => `<tr><td>${c.isCapital ? icon('castle', 12) + ' ' : ''}${esc(c.name)}</td><td class="num">${fmtCompact(c.population)}</td><td class="num">${Math.round(c.importance)}</td><td class="num">${Math.round(c.infrastructure)}</td><td class="num">${fmtCompact(c.production)}</td><td class="num">${Math.round(c.strategic)}</td></tr>`)
-      .join('')}</table>`;
+    const cityTable = table(
+      [['Cidade'], ['Pop.', true], ['Import.', true], ['Infra.', true], ['Produção', true], ['Estrat.', true]],
+      cities
+        .map((c) => `<tr>${td(`${c.isCapital ? `${icon('castle', 12)} ` : ''}${esc(c.name)}`)}${td(fmtCompact(c.population), true)}${td(String(Math.round(c.importance)), true)}${td(String(Math.round(c.infrastructure)), true)}${td(fmtCompact(c.production), true)}${td(String(Math.round(c.strategic)), true)}</tr>`)
+        .join(''),
+    );
     const armies = sim.index.armiesIn(this.id);
     const armyRows = armies.length
-      ? armies.map((a) => `<div class="row link" data-army="${a.id}">${icon('sword', 16)}<span class="grow">${esc(a.name)} <span class="muted">${esc(armyStatus(sim, a))}</span></span><span class="num">${fmtCompact(soldiersOf(a))}</span></div>`).join('')
-      : '<div class="muted">Nenhum exército.</div>';
-    const neighbors = mp.nb
-      .map(([q]) => `<div class="row"><span class="grow">${pLink(sim, q)}</span><span class="muted">${esc(sim.country(sim.state.provinces[q].owner).name)}</span></div>`)
-      .join('');
-    const actions = `
-      <div class="action"><button class="px-btn small" data-action="incite">${icon('fire', 14)} Incitar revolta</button><button class="px-btn small" data-action="fortify">${icon('castle', 14)} Fortificar</button></div>
-      <div class="action"><select class="px-select" data-change="pick" data-f="to">${countryOptions(sim, ps.owner, Number(this.transferTo || -1))}</select><button class="px-btn small" data-action="transfer">Transferir estado</button></div>`;
-    return dados + siege + sec('Cidades', 'house', cityTable) + sec('Exércitos presentes', 'sword', `<div class="rows">${armyRows}</div>`) + sec('Vizinhos', 'pin', `<div class="rows">${neighbors}</div>`) + sec('Ações', 'gear', actions);
+      ? armies.map((a) => row(`${icon('sword', 16)}${stack(`${esc(a.name)}${sub(esc(armyStatus(sim, a)))}`)}${num(fmtCompact(soldiersOf(a)))}`, { link: true, top: true, attrs: `data-army="${a.id}"` })).join('')
+      : mutedBlock('Nenhum exército.');
+    const neighbors = mp.nb.map(([q]) => row(`${grow(pLink(sim, q))}${muted(esc(sim.country(sim.state.provinces[q].owner).name))}`)).join('');
+    const acoes = `<div class="flex flex-col gap-1.5">${actions(button('Incitar revolta', { size: 'sm', icon: 'fire', attrs: 'data-action="incite"' }) + button('Fortificar', { size: 'sm', icon: 'castle', attrs: 'data-action="fortify"' }))}${actions(
+      `<select class="${FIELD_GROW}" data-change="pick" data-f="to">${countryOptions(sim, ps.owner, Number(this.transferTo || -1))}</select>${button('Transferir estado', { size: 'sm', attrs: 'data-action="transfer"' })}`,
+    )}</div>`;
+    return dados + siege + section('Cidades', 'house', cityTable) + section('Exércitos presentes', 'sword', rows(armyRows)) + section('Vizinhos', 'pin', rows(neighbors)) + section('Ações', 'gear', acoes);
   }
 
   protected action(name: string, t: HTMLElement): void {

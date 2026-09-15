@@ -182,7 +182,8 @@ src/sim/engines/       Country, Province, City, Population, Economy, Tech, Gover
 src/render/            MAP RENDERING: câmera, camadas (terreno, político, rótulos, marcadores, unidades),
                        sprites em pixel art e modos de mapa
 src/ui/                UI: telas, HUD, painéis (nação, estado, exército, batalha, guerra, histórico),
-                       modais (estatísticas, configurações, salvar/carregar) e gráficos
+                       modais (estatísticas, configurações, salvar/carregar) e gráficos, em Tailwind:
+                       tema e utilitários de pixel art em styles.css, componentes em components.ts
 src/persistence/       saves no IndexedDB (gzip), exportação/importação .avsave
 src/app/               App (fluxo de telas) e GameLoop (velocidades)
 scripts/               simulação sem interface e teste de ponta a ponta no navegador
@@ -213,4 +214,5 @@ capturas de tela da partida, dos painéis, das estatísticas e do salvamento/car
 ## Créditos
 
 Dados geográficos: Natural Earth e NASA Blue Marble (domínio público). Fontes: Pixelify Sans,
-Jacquarda Bastarda 9 e Tiny5 (SIL Open Font License), via Fontsource.
+Jacquarda Bastarda 9, Tiny5 e Open Sans (SIL Open Font License), via Fontsource. A interface usa
+Tailwind CSS: dados em Open Sans e títulos, botões e HUD em fonte pixelada.

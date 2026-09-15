@@ -2,9 +2,10 @@
 // selecionada. Clique em uma tecnologia para ver dados, preco, difusao, paises e a trajetoria completa.
 import { HISTORICAL_ERAS, eraSpan } from '../../data/eras';
 import { TECH_CATEGORIES } from '../../data/technologies';
+import { closeButton, empty, FIELD, headTitles, MUTED, mutedBlock, row, rows, section, stack } from '../components';
 import { esc, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
-import { sec, techDot, worldTechStatus } from './common';
+import { techDot, worldTechStatus } from './common';
 import { BasePanel } from './Panel';
 
 type TechFilter = 'todas' | 'descobertas' | 'pendentes' | 'futuras' | 'pais';
@@ -29,8 +30,7 @@ export class TechnologiesPanel extends BasePanel {
     const db = sim.technology.db;
     let discovered = 0;
     for (const t of db.all) if (sim.state.technologies[t.id].discovered) discovered++;
-    return `${icon('gear', 36)}<div class="titles"><h2>Tecnologias</h2><div class="sub">${esc(sim.eras.current().name)} · ${discovered} descobertas de ${db.countUntil(sim.year())} possíveis · ${db.size} no banco</div></div>
-      <button class="px-btn square" data-close title="Fechar (T)">${icon('close', 16)}</button>`;
+    return `${icon('gear', 36)}${headTitles('Tecnologias', [`${esc(sim.eras.current().name)} · ${discovered} descobertas de ${db.countUntil(sim.year())} possíveis · ${db.size} no banco`])}${closeButton('Fechar (T)')}`;
   }
 
   protected action(name: string, target: HTMLElement): void {
@@ -57,14 +57,14 @@ export class TechnologiesPanel extends BasePanel {
     if (country) filters.push(['pais', `Dominadas por ${country.name}`]);
     const filterOpts = filters.map(([v, l]) => option(v, l, this.filter)).join('');
     const controls = `
-      <div class="tech-filters">
-        <select class="px-select" data-change="era">${eraOpts}</select>
-        <select class="px-select" data-change="category">${catOpts}</select>
-        <select class="px-select" data-change="filter">${filterOpts}</select>
-        <input class="px-input" data-change="search" placeholder="Buscar tecnologia" value="${esc(this.search)}">
+      <div class="mb-1.5 grid grid-cols-2 gap-1">
+        <select class="${FIELD} w-full" data-change="era">${eraOpts}</select>
+        <select class="${FIELD} w-full" data-change="category">${catOpts}</select>
+        <select class="${FIELD} w-full" data-change="filter">${filterOpts}</select>
+        <input class="${FIELD} w-full" data-change="search" placeholder="Buscar tecnologia" value="${esc(this.search)}">
       </div>
-      <div class="tech-legend">${techDot('dominada')} Dominada ${techDot('desenvolvimento')} Em desenvolvimento ${techDot('indisponivel')} Não disponível</div>
-      <div class="muted">${country ? `1º marcador: situação no mundo · 2º marcador: situação ${esc(sim.countries.in(country.id))}.` : 'Marcador: situação no mundo. Selecione uma nação no mapa para ver também a situação dela.'}</div>`;
+      <div class="mt-0.5 mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">${techDot('dominada')} Dominada ${techDot('desenvolvimento')} Em desenvolvimento ${techDot('indisponivel')} Não disponível</div>
+      ${mutedBlock(country ? `1º marcador: situação no mundo · 2º marcador: situação ${esc(sim.countries.in(country.id))}.` : 'Marcador: situação no mundo. Selecione uma nação no mapa para ver também a situação dela.')}`;
 
     const groups = new Map<string, string[]>();
     for (const t of tech.db.all) {
@@ -80,12 +80,12 @@ export class TechnologiesPanel extends BasePanel {
       const info = rec.discovered ? `${rec.holders} ${rec.holders === 1 ? 'país' : 'países'}` : t.anoDescoberta > year ? 'futura' : 'por descobrir';
       const when = t.antiguidade ? 'Antiguidade' : String(t.anoDescoberta);
       const list = groups.get(t.era) ?? [];
-      list.push(`<div class="row link" data-tech="${esc(t.id)}">${techDot(worldTechStatus(sim, t))}${own}<span class="grow">${esc(t.nome)}</span><span class="muted">${when} · ${info}</span></div>`);
+      list.push(row(`${techDot(worldTechStatus(sim, t))}${own}${stack(esc(t.nome))}<span class="${MUTED} shrink-0 whitespace-nowrap">${when} · ${info}</span>`, { link: true, attrs: `data-tech="${esc(t.id)}"` }));
       groups.set(t.era, list);
     }
     const sections = HISTORICAL_ERAS.filter((e) => groups.has(e.id))
-      .map((e) => sec(`${e.name} (${groups.get(e.id)?.length ?? 0})`, 'gear', `<div class="rows">${(groups.get(e.id) ?? []).join('')}</div>`))
+      .map((e) => section(`${e.name} (${groups.get(e.id)?.length ?? 0})`, 'gear', rows((groups.get(e.id) ?? []).join(''))))
       .join('');
-    return controls + (sections || '<div class="empty">Nenhuma tecnologia encontrada.</div>');
+    return controls + (sections || empty('Nenhuma tecnologia encontrada.'));
   }
 }

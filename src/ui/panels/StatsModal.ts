@@ -4,9 +4,9 @@ import { fmtArea, fmtCompact, fmtInt, fmtMoney } from '../../core/format';
 import { RANK_LABELS, type RankMetric } from '../../sim/engines/StatsEngine';
 import type { StatsSeries } from '../../state/types';
 import { chartColor, LineChart } from '../charts/LineChart';
+import { actions, button, CHART_WRAP, chartTitle, LINK, modalTitle, mutedBlock, section } from '../components';
 import { esc, flagInline, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
-import { sec } from './common';
 import { BasePanel } from './Panel';
 
 const RANKS: { metric: RankMetric; icon: string; fmt: (v: number) => string }[] = [
@@ -49,7 +49,7 @@ export class StatsModal extends BasePanel {
   }
 
   protected renderHead(): string {
-    return `${icon('chart', 32)}<h2>Estatísticas — ${this.sim.year()}</h2><button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>`;
+    return modalTitle('chart', `Estatísticas — ${this.sim.year()}`);
   }
 
   protected renderBody(): string {
@@ -64,34 +64,41 @@ export class StatsModal extends BasePanel {
     const sim = this.sim;
     const cards = RANKS.map(({ metric, icon: ic, fmt }) => {
       const list = sim.stats.ranking(metric, 10);
-      return `<div class="rank-card"><h4>${icon(ic, 16)} ${esc(RANK_LABELS[metric])}</h4><ol>${list
-        .map((r) => `<li data-country="${r.country.id}">${flagInline(r.country, 16)} ${esc(r.country.name)}<span>${fmt(r.value)}</span></li>`)
-        .join('')}</ol></div>`;
+      const items = list
+        .map((r) => `<li class="cursor-pointer py-px hover:underline" data-country="${r.country.id}">${flagInline(r.country, 16)} ${esc(r.country.name)}<span class="float-right font-semibold">${fmt(r.value)}</span></li>`)
+        .join('');
+      return `<div class="border-2 border-edge bg-paper-2 px-2 py-1.5" data-ui="rank-card"><h4 class="mb-1 flex items-center gap-1.5 font-pixel text-sm">${icon(ic, 16)}${esc(RANK_LABELS[metric])}</h4><ol class="list-decimal pl-[22px] text-[12.5px]">${items}</ol></div>`;
     }).join('');
     const counts = new Map<string, number>();
     for (const e of sim.state.history) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
     const nations = sim.countries.nations();
-    const facts = `<div class="kv2">
-      <div>${icon('flag', 16)} Nações existentes: <b>${nations.length}</b></div>
-      <div>${icon('swords', 16)} Guerras declaradas: <b>${counts.get('war_declared') ?? 0}</b></div>
-      <div>${icon('sword', 16)} Batalhas registradas: <b>${counts.get('battle') ?? 0}</b></div>
-      <div>${icon('skull', 16)} Nações extintas: <b>${sim.state.countries.filter((c) => !c.alive && c.kind === 'nation').length}</b></div>
-      <div>${icon('flag', 16)} Independências: <b>${counts.get('independence') ?? 0}</b></div>
-      <div>${icon('fire', 16)} Rebeliões: <b>${counts.get('rebellion') ?? 0}</b></div>
-      <div>${icon('crown', 16)} Golpes e revoluções: <b>${(counts.get('coup') ?? 0) + (counts.get('revolution') ?? 0)}</b></div>
-      <div>${icon('dove', 16)} Tratados de paz: <b>${counts.get('peace') ?? 0}</b></div>
+    const fact = (iconName: string, label: string, value: number) => `<div>${icon(iconName, 16)} ${label}: <b>${value}</b></div>`;
+    const facts = `<div class="grid grid-cols-2 gap-x-3.5 gap-y-0.5">
+      ${fact('flag', 'Nações existentes', nations.length)}
+      ${fact('swords', 'Guerras declaradas', counts.get('war_declared') ?? 0)}
+      ${fact('sword', 'Batalhas registradas', counts.get('battle') ?? 0)}
+      ${fact('skull', 'Nações extintas', sim.state.countries.filter((c) => !c.alive && c.kind === 'nation').length)}
+      ${fact('flag', 'Independências', counts.get('independence') ?? 0)}
+      ${fact('fire', 'Rebeliões', counts.get('rebellion') ?? 0)}
+      ${fact('crown', 'Golpes e revoluções', (counts.get('coup') ?? 0) + (counts.get('revolution') ?? 0))}
+      ${fact('dove', 'Tratados de paz', counts.get('peace') ?? 0)}
     </div>`;
-    return sec('Rankings', 'trophy', `<div class="rank-grid">${cards}</div>`) + sec('Números da história', 'book', facts);
+    return section('Rankings', 'trophy', `<div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-2.5">${cards}</div>`) + section('Números da história', 'book', facts);
   }
 
   private world(): string {
-    const block = (key: string, title: string, iconName: string) => `<div class="chart-title">${icon(iconName, 16)} ${esc(title)}</div><div class="chart-wrap"><canvas data-world="${key}" style="height:200px"></canvas></div>`;
-    return sec('Evolução mundial', 'globe', block('pop', 'População mundial', 'people') + block('gdp', 'PIB mundial', 'chart') + block('countries', 'Nações existentes', 'flag') + block('wars', 'Guerras em andamento', 'swords'));
+    const block = (key: string, title: string, iconName: string) => `${chartTitle(iconName, title)}<div class="${CHART_WRAP}"><canvas class="block w-full" data-world="${key}" style="height:200px"></canvas></div>`;
+    return section('Evolução mundial', 'globe', block('pop', 'População mundial', 'people') + block('gdp', 'PIB mundial', 'chart') + block('countries', 'Nações existentes', 'flag') + block('wars', 'Guerras em andamento', 'swords'));
   }
 
   private comparison(): string {
-    const buttons = COMPARE.map((c) => `<button class="px-btn small${c.key === this.compare ? ' on' : ''}" data-action="compare" data-key="${c.key}">${esc(c.label)}</button>`).join('');
-    return sec('Maiores nações', 'chart', `<div class="action">${buttons}</div><div class="chart-wrap"><canvas data-compare style="height:320px"></canvas><div class="chart-legend" data-legend></div></div><div class="muted">As 8 maiores nações atuais pelo critério escolhido. Passe o mouse sobre o gráfico para ler os valores.</div>`);
+    const buttons = COMPARE.map((c) => button(esc(c.label), { size: 'sm', pressed: c.key === this.compare, attrs: `data-action="compare" data-key="${c.key}"` })).join('');
+    return section(
+      'Maiores nações',
+      'chart',
+      `${actions(buttons)}<div class="${CHART_WRAP}"><canvas class="block w-full" data-compare style="height:320px"></canvas><div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs" data-legend></div></div>` +
+        mutedBlock('As 8 maiores nações atuais pelo critério escolhido. Passe o mouse sobre o gráfico para ler os valores.', 'mt-1'),
+    );
   }
 
   private frames(): { year: number; owners: number[] }[] {
@@ -102,16 +109,19 @@ export class StatsModal extends BasePanel {
   private evolution(): string {
     const frames = this.frames();
     if (this.frame < 0 || this.frame >= frames.length) this.frame = frames.length - 1;
-    return sec('Evolução territorial', 'globe', `
-      <div class="action">
-        <button class="px-btn small" data-action="evo-prev">«</button>
-        <input class="px-range" type="range" min="0" max="${frames.length - 1}" value="${this.frame}" data-evo-range style="flex:1">
-        <button class="px-btn small" data-action="evo-next">»</button>
-        <b data-evo-year style="min-width:52px;text-align:right">${frames[this.frame].year}</b>
-        <button class="px-btn small" data-action="evo-play">${icon(this.timer ? 'pause' : 'play', 14)} ${this.timer ? 'Pausar' : 'Reproduzir'}</button>
-      </div>
-      <div class="chart-wrap"><canvas data-evo style="height:440px"></canvas></div>
-      <div class="muted">Retratos das fronteiras a cada década desde ${this.sim.state.startYear}. Nações extintas mantêm suas cores originais.</div>`);
+    const controls = actions(
+      button('«', { size: 'sm', attrs: 'data-action="evo-prev"' }) +
+        `<input class="min-w-0 flex-1 accent-red" type="range" min="0" max="${frames.length - 1}" value="${this.frame}" data-evo-range>` +
+        button('»', { size: 'sm', attrs: 'data-action="evo-next"' }) +
+        `<b class="min-w-[52px] text-right" data-evo-year>${frames[this.frame].year}</b>` +
+        button(this.timer ? 'Pausar' : 'Reproduzir', { size: 'sm', icon: this.timer ? 'pause' : 'play', iconSize: 14, attrs: 'data-action="evo-play"' }),
+    );
+    return section(
+      'Evolução territorial',
+      'globe',
+      `${controls}<div class="${CHART_WRAP}"><canvas class="block w-full" data-evo style="height:440px"></canvas></div>` +
+        mutedBlock(`Retratos das fronteiras a cada década desde ${this.sim.state.startYear}. Nações extintas mantêm suas cores originais.`, 'mt-1'),
+    );
   }
 
   private evoImage(index: number): HTMLCanvasElement {
@@ -209,7 +219,11 @@ export class StatsModal extends BasePanel {
       });
       this.charts.push(new LineChart(canvas, { x: years, series, yFormat: def.fmt, xFormat: String, directLabels: true }));
       const legend = this.bodyEl.querySelector('[data-legend]');
-      if (legend) legend.innerHTML = series.map((s, i) => `<span data-country="${top[i].country.id}" class="lnk"><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join('');
+      if (legend) {
+        legend.innerHTML = series
+          .map((s, i) => `<span data-country="${top[i].country.id}" class="${LINK} inline-flex items-center gap-1"><i class="inline-block h-1 w-3.5" style="background:${s.color}"></i>${esc(s.label)}</span>`)
+          .join('');
+      }
     }
     const range = this.bodyEl.querySelector<HTMLInputElement>('[data-evo-range]');
     if (range) {

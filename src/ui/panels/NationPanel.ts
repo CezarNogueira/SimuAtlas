@@ -18,12 +18,50 @@ import { agePt } from '../../sim/names';
 import type { ActionResult, PlayerGoal, TreatyAction } from '../../sim/PlayerActions';
 import type { War } from '../../state/types';
 import { chartColor, LineChart } from '../charts/LineChart';
-import { bar, centerBar, esc, flag, icon, kv } from '../dom';
+import {
+  actions,
+  banner,
+  bar,
+  barRow,
+  button,
+  centerBar,
+  chartTitle,
+  chip,
+  closeButton,
+  COLORS,
+  FIELD_GROW,
+  focusButton,
+  grow,
+  headButtons,
+  headTitles,
+  hint,
+  kv,
+  kvGrid,
+  kvItems,
+  kvList,
+  MUTED,
+  muted,
+  mutedBlock,
+  num,
+  row,
+  ROWS,
+  rows,
+  section,
+  signed,
+  SPARK,
+  stack,
+  sub,
+  table,
+  td,
+  TR_LINK,
+} from '../components';
+import { esc, flag, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
-import { armyStatus, cLink, countryOptions, dateOf, historyList, kvGrid, pLink, sec, techDot, techLink, warLink } from './common';
+import { armyStatus, cLink, countryOptions, dateOf, historyList, pLink, techDot, techLink, warLink } from './common';
 import { BasePanel } from './Panel';
 
-const barRow = (v: number, color: string) => `<span></span><div class="full">${bar(v, color)}</div>`;
+// Varias linhas de formulario/botoes empilhadas com espaco entre elas.
+const formRows = (html: string) => `<div class="flex flex-col gap-1.5">${html}</div>`;
 
 export class NationPanel extends BasePanel {
   private form: Record<string, string> = { target: '', goal: 'conquest', dip: '', gov: '', pers: '', event: EVENTS[0].id, name: '' };
@@ -60,16 +98,8 @@ export class NationPanel extends BasePanel {
     const c = sim.country(this.id);
     const gov = GOVERNMENTS[c.government];
     const title = c.kind === 'nation' ? sim.countries.formalName(c.id) : c.name;
-    return `${flag(c, 64)}
-      <div class="titles">
-        <h2>${esc(title)}</h2>
-        <div class="sub">${esc(c.name)} · ${esc(gov.name)}${c.alive ? '' : ` · extinta em ${dateOf(sim, c.died)}`}</div>
-        <div class="sub">${esc(gov.rulerTitle)} ${esc(c.ruler.name)}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
-        <button class="px-btn square" data-close title="Fechar (Esc)">${icon('close', 16)}</button>
-        <button class="px-btn square" data-action="focus" title="Centralizar no mapa">${icon('target', 16)}</button>
-      </div>`;
+    const subs = [`${esc(c.name)} · ${esc(gov.name)}${c.alive ? '' : ` · extinta em ${dateOf(sim, c.died)}`}`, `${esc(gov.rulerTitle)} ${esc(c.ruler.name)}`];
+    return `${flag(c, 64)}${headTitles(esc(title), subs)}${headButtons(closeButton('Fechar (Esc)') + focusButton())}`;
   }
 
   protected renderBody(): string {
@@ -118,40 +148,42 @@ export class NationPanel extends BasePanel {
       const r = sim.state.provinces[p].resource;
       resources.set(r, (resources.get(r) ?? 0) + 1);
     }
-    const topRes = [...resources.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([r, n]) => `${RESOURCES[r as keyof typeof RESOURCES].name} (${n})`).join(', ') || '—';
+    const topRes = [...resources.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([r, n]) => `${esc(RESOURCES[r as keyof typeof RESOURCES].name)} (${n})`);
     const nation = c.kind === 'nation' && c.alive;
-    const rank = (m: 'population' | 'gdp' | 'army' | 'area' | 'tech') => (nation ? ` <span class="muted">#${sim.stats.rankOf(c.id, m)}</span>` : '');
+    const rank = (m: 'population' | 'gdp' | 'army' | 'area' | 'tech') => (nation ? ` ${muted(`#${sim.stats.rankOf(c.id, m)}`)}` : '');
     const mainResearch = Object.entries(c.techs).filter(([, h]) => h.stage === 'pesquisa').sort((a, b) => b[1].progress - a[1].progress)[0];
     const age = agePt(c.ruler.birthDay, sim.day);
     const wars = sim.wars.warsOf(c.id);
     const vassals = sim.state.countries.filter((v) => v.alive && v.overlord === c.id);
-    const rebelInfo = c.rebel ? `<div class="banner red">${icon('fire', 20)} Facção rebelde (${esc({ separatist: 'separatista', revolution: 'revolucionária', restoration: 'restauracionista', civil_war: 'guerra civil' }[c.rebel.type])}) contra ${cLink(sim, c.rebel.target)}</div>` : '';
+    const rebelType = c.rebel ? { separatist: 'separatista', revolution: 'revolucionária', restoration: 'restauracionista', civil_war: 'guerra civil' }[c.rebel.type] : '';
+    const rebelInfo = c.rebel ? banner(`${icon('fire', 20)} Facção rebelde (${esc(rebelType)}) contra ${cLink(sim, c.rebel.target)}`, 'red') : '';
 
     const pg = sim.population.growthInfo(c);
     const brakes = ([
       ['instabilidade', pg.stability], ['guerra', pg.war], ['falta de terras', pg.crowding], ['ocupação', pg.occupation],
       ['destruição', pg.devastation], ['epidemias', pg.epidemic], ['fome e escassez', pg.hardship],
     ] as const).filter(([, v]) => v <= -0.00005).map(([label, v]) => `${label} ${fmtSignedPct(v, 2)}`);
+    const tier = ({ potencia: 'potência', regional: 'regional', fraco: 'fraco' } as const)[sim.countries.powerTier(c.id)];
     const dados = kvGrid([
-      kv('castle', 'Capital', c.capital < 0 ? '—' : sim.provinces.cityName(c.capital) === sim.provinces.name(c.capital) ? pLink(sim, c.capital) : `${esc(sim.provinces.cityName(c.capital))} <span class="muted">(${pLink(sim, c.capital)})</span>`),
+      kv('castle', 'Capital', c.capital < 0 ? '—' : sim.provinces.cityName(c.capital) === sim.provinces.name(c.capital) ? pLink(sim, c.capital) : `${esc(sim.provinces.cityName(c.capital))}${sub(pLink(sim, c.capital))}`),
       kv('people', 'População', fmtInt(c.population) + rank('population')),
-      kv('chart', 'Crescimento populacional', `<span class="${pg.rate >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(pg.rate, 2)} ao ano</span> <span class="muted">(natural ${fmtPct(pg.base, 2)})</span>`),
-      kv('info', 'Freios', brakes.length ? `<span class="muted">${brakes.join('<br>')}</span>` : '<span class="muted">nenhum</span>'),
-      kv('crown', 'Poder regional', nation ? `<span title="Poder frente à maior potência entre o país e seus vizinhos (população, economia e força militar). Países fracos não conquistam território.">${fmtPct(sim.countries.regionalPower(c.id), 0)} <span class="muted">${({ potencia: 'potência', regional: 'regional', fraco: 'fraco' } as const)[sim.countries.powerTier(c.id)]}</span></span>` : '—'),
+      kv('chart', 'Crescimento populacional', `${signed(`${fmtSignedPct(pg.rate, 2)} ao ano`, pg.rate >= 0)}${sub(`natural ${fmtPct(pg.base, 2)}`)}`),
+      kvList('info', 'Freios', brakes),
+      kv('crown', 'Poder regional', nation ? `<span title="Poder frente à maior potência entre o país e seus vizinhos (população, economia e força militar). Países fracos não conquistam território.">${fmtPct(sim.countries.regionalPower(c.id), 0)} ${muted(tier)}</span>` : '—'),
       kv('pin', 'Área', fmtArea(c.area) + rank('area')),
       kv('chart', 'PIB', fmtMoney(c.gdp) + rank('gdp')),
       kv('coins', 'PIB per capita', fmtMoney(gdppc)),
       kv('coins', 'Renda média', fmtMoney(avgIncome)),
-      kv('chart', 'Crescimento do PIB', `<span class="${c.growth >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(c.growth)}</span>`),
+      kv('chart', 'Crescimento do PIB', signed(fmtSignedPct(c.growth), c.growth >= 0)),
       kv('building', 'Produção anual', fmtMoney(production * 12)),
-      kv('coins', 'Recursos', '') + `<span></span><span class="list">${esc(topRes)}</span>`,
+      kvList('coins', 'Recursos', topRes, '—'),
       kv('chest', 'Tesouro', fmtMoney(c.treasury)),
     ]);
     const sociedade = kvGrid([
-      kv('scales', 'Estabilidade', `${Math.round(c.stability)}%`), barRow(c.stability / 100, 'var(--green)'),
-      kv('coins', 'Corrupção', fmtPct(c.corruption, 0)), barRow(c.corruption, 'var(--red-2)'),
-      kv('smile', 'Felicidade', `${Math.round(c.happiness)}%`), barRow(c.happiness / 100, 'var(--gold)'),
-      kv('crown', 'Prestígio', `${Math.round(c.prestige)}`), barRow(c.prestige / 100, 'var(--blue)'),
+      kv('scales', 'Estabilidade', `${Math.round(c.stability)}%`), barRow(c.stability / 100, COLORS.green),
+      kv('coins', 'Corrupção', fmtPct(c.corruption, 0)), barRow(c.corruption, COLORS.red),
+      kv('smile', 'Felicidade', `${Math.round(c.happiness)}%`), barRow(c.happiness / 100, COLORS.gold),
+      kv('crown', 'Prestígio', `${Math.round(c.prestige)}`), barRow(c.prestige / 100, COLORS.blue),
       kv('swords', 'Exaustão de guerra', `${Math.round(c.warExhaustion)}%`),
       kv('fire', 'Expansão agressiva', `${Math.round(c.aggressiveExpansion)}`),
     ]);
@@ -160,28 +192,36 @@ export class NationPanel extends BasePanel {
       kv('book', 'Ideologia', esc(IDEOLOGIES[c.ideology].name)),
       kv('temple', 'Religião', esc(RELIGIONS[c.religion].name)),
       kv('people', 'Cultura', esc(CULTURES[c.culture].name)),
-      kv('info', 'Personalidade (IA)', `<span title="${esc(pers.description)}">${esc(pers.name)}</span>${EXPANSIONIST_PERSONALITIES.has(c.personality) ? '' : ' <span class="muted">(não inicia conquistas)</span>'}`),
+      kv('info', 'Personalidade (IA)', `<span title="${esc(pers.description)}">${esc(pers.name)}</span>${EXPANSIONIST_PERSONALITIES.has(c.personality) ? '' : sub('não inicia conquistas')}`),
       kv('gear', 'Nível tecnológico', `${fmtDec(c.tech)}${rank('tech')}`),
       kv('gear', 'Pesquisa principal', mainResearch ? techLink(sim, mainResearch[0]) : '—'),
       kv('sword', 'Poder militar', fmtCompact(sim.countries.strength(c.id)) + rank('army')),
-      kv('scroll', 'Diplomacia autônoma', c.ai ? 'Sim' : 'Não (controle manual)'),
+      kv('scroll', 'Diplomacia autônoma', c.ai ? 'Sim' : `Não${sub('controle manual')}`),
     ]);
-    const skills = (label: string, v: number) => `<span>${label}</span>${bar(v / 10, 'var(--blue)')}<span>${v}</span>`;
+    const skill = (label: string, v: number) => `<span>${label}</span>${bar(v / 10, COLORS.blue)}<span>${v}</span>`;
     const governante = `
-      <div class="row"><b class="grow">${esc(gov.rulerTitle)} ${esc(c.ruler.name)}</b><span class="muted">casa ${esc(c.ruler.house)} · ${age} anos · desde ${sim.year(c.ruler.startDay)}</span></div>
-      <div class="skills">${skills('Administração', c.ruler.skills.adm)}${skills('Diplomacia', c.ruler.skills.dip)}${skills('Militar', c.ruler.skills.mil)}</div>
-      <div style="margin-top:4px">${c.ruler.traits.map((t) => `<span class="chip">${esc(t)}</span>`).join('')}</div>`;
+      <div class="mb-1.5 flex flex-col"><b>${esc(gov.rulerTitle)} ${esc(c.ruler.name)}</b>${muted(`casa ${esc(c.ruler.house)} · ${age} anos · no poder desde ${sim.year(c.ruler.startDay)}`)}</div>
+      <div class="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0.5 text-[12.5px]">${skill('Administração', c.ruler.skills.adm)}${skill('Diplomacia', c.ruler.skills.dip)}${skill('Militar', c.ruler.skills.mil)}</div>
+      <div class="mt-1">${c.ruler.traits.map((t) => chip(esc(t))).join('')}</div>`;
     const situacao = [
       wars.length ? `<div>${icon('swords', 16)} Em guerra: ${wars.map((w) => warLink(w)).join(', ')}</div>` : `<div>${icon('dove', 16)} Em paz</div>`,
       c.overlord >= 0 ? `<div>${icon('crown', 16)} Vassalo de ${cLink(sim, c.overlord)}</div>` : '',
       vassals.length ? `<div>${icon('crown', 16)} Vassalos: ${vassals.map((v) => cLink(sim, v.id)).join(', ')}</div>` : '',
-      c.modifiers.length ? `<div>${c.modifiers.map((m) => `<span class="chip gold" title="até ${dateOf(sim, m.until)}">${esc(m.name)}</span>`).join('')}</div>` : '',
-      `<div class="muted">Fundada em ${sim.year(c.founded)} · ${c.warsWon} guerras vencidas, ${c.warsLost} perdidas · ${c.battlesWon}/${c.battlesLost} batalhas</div>`,
+      c.modifiers.length ? `<div>${c.modifiers.map((m) => chip(esc(m.name), 'gold', `title="até ${dateOf(sim, m.until)}"`)).join('')}</div>` : '',
+      mutedBlock(`Fundada em ${sim.year(c.founded)} · ${c.warsWon} guerras vencidas, ${c.warsLost} perdidas · ${c.battlesWon}/${c.battlesLost} batalhas`),
     ].join('');
     const charts = sim.state.stats.countries[c.id]?.years.length
-      ? `<div class="chart-title">${icon('people', 16)} População</div><canvas class="spark" data-chart="pop"></canvas><div class="chart-title">${icon('chart', 16)} PIB</div><canvas class="spark" data-chart="gdp"></canvas>`
+      ? `${chartTitle('people', 'População')}<canvas class="${SPARK}" data-chart="pop"></canvas>${chartTitle('chart', 'PIB')}<canvas class="${SPARK}" data-chart="gdp"></canvas>`
       : '';
-    return rebelInfo + sec('Dados gerais', 'globe', dados) + sec('Sociedade', 'scales', sociedade) + sec('Governo', 'crown', estado) + sec('Governante', 'crown', governante) + sec('Situação', 'flag', situacao) + (charts ? sec('Evolução', 'chart', charts) : '');
+    return (
+      rebelInfo +
+      section('Dados gerais', 'globe', dados) +
+      section('Sociedade', 'scales', sociedade) +
+      section('Governo', 'crown', estado) +
+      section('Governante', 'crown', governante) +
+      section('Situação', 'flag', situacao) +
+      (charts ? section('Evolução', 'chart', charts) : '')
+    );
   }
 
   private economia(): string {
@@ -198,10 +238,10 @@ export class NationPanel extends BasePanel {
     const balance = c.income - c.expenses;
     const trades = sim.diplomacy.partners(c.id, 'trade');
     const sanctions = sim.state.treaties.filter((t) => t.active && t.type === 'sanction' && t.target === c.id).length;
-    const rows = kvGrid([
+    const financas = kvGrid([
       kv('chart', 'PIB anual', fmtMoney(c.gdp)),
       kv('coins', 'PIB per capita', fmtMoney(gdppc)),
-      kv('chart', 'Crescimento anual', `<span class="${c.growth >= 0 ? 'pos' : 'neg'}">${fmtSignedPct(c.growth)}</span>`),
+      kv('chart', 'Crescimento anual', signed(fmtSignedPct(c.growth), c.growth >= 0)),
       kv('coins', 'Receita mensal', fmtMoney(c.income)),
       kv('', '· impostos e saques', fmtMoney(c.income - c.tradeIncome)),
       kv('', '· comércio', fmtMoney(c.tradeIncome)),
@@ -211,35 +251,40 @@ export class NationPanel extends BasePanel {
       kv('', '· força aérea', fmtMoney(air)),
       kv('', '· administração', fmtMoney(admin)),
       kv('', '· juros da dívida', fmtMoney(interest)),
-      kv('scales', 'Saldo mensal', `<span class="${balance >= 0 ? 'pos' : 'neg'}">${fmtMoney(balance)}</span>`),
+      kv('scales', 'Saldo mensal', signed(fmtMoney(balance), balance >= 0)),
       kv('chest', 'Tesouro', fmtMoney(c.treasury)),
-      kv('scroll', 'Dívida', `${fmtMoney(c.debt)} <span class="muted">(${fmtPct(c.gdp > 0 ? c.debt / c.gdp : 0, 0)} do PIB)</span>`),
+      kv('scroll', 'Dívida', `${fmtMoney(c.debt)}${sub(`${fmtPct(c.gdp > 0 ? c.debt / c.gdp : 0, 0)} do PIB`)}`),
       kv('fire', 'Inflação', fmtPct(c.inflation)),
       kv('people', 'Desemprego', fmtPct(c.unemployment)),
       kv('coins', 'Impostos', fmtPct(c.taxRate)),
-      kv('scroll', 'Acordos comerciais', trades.length ? trades.map((t) => cLink(sim, t)).join('<br>') : '0'),
+      kvList('scroll', 'Acordos comerciais', trades.map((t) => cLink(sim, t))),
       kv('skull', 'Sanções sofridas', String(sanctions)),
     ]);
     const mods = c.modifiers.filter((m) => m.economy || m.growth);
-    const modsHtml = mods.length ? mods.map((m) => `<span class="chip ${((m.economy ?? 0) + (m.growth ?? 0)) >= 0 ? 'green' : 'red'}">${esc(m.name)} até ${sim.year(m.until)}</span>`).join('') : '<span class="muted">Nenhum</span>';
-    const chart = sim.state.stats.countries[c.id]?.years.length ? `<canvas class="spark" style="height:140px" data-chart="gdp"></canvas>` : '';
+    const modsHtml = mods.length ? mods.map((m) => chip(`${esc(m.name)} até ${sim.year(m.until)}`, (m.economy ?? 0) + (m.growth ?? 0) >= 0 ? 'green' : 'red')).join('') : muted('Nenhum');
+    const chart = sim.state.stats.countries[c.id]?.years.length ? `<canvas class="${SPARK}" style="height:140px" data-chart="gdp"></canvas>` : '';
     const inflationLabel = c.inflation >= 0.3 ? 'escassez grave' : c.inflation >= 0.2 ? 'escassez' : c.inflation >= 0.1 ? 'alta' : 'controlada';
     const warHint =
       war.atWar || war.devastation > 0.05
-        ? '<div class="hint-box">A guerra custa caro: tropas em campanha, armamentos e munição são pagos com dívida; a mobilização, a destruição e a ocupação fazem faltar produtos e a inflação sobe. Estados arrasados produzem menos até serem reconstruídos, e sem crédito os soldos atrasam e as tropas desertam.</div>'
+        ? hint('A guerra custa caro: tropas em campanha, armamentos e munição são pagos com dívida; a mobilização, a destruição e a ocupação fazem faltar produtos e a inflação sobe. Estados arrasados produzem menos até serem reconstruídos, e sem crédito os soldos atrasam e as tropas desertam.')
         : '';
     const warRows = kvGrid([
-      kv('swords', 'Situação', war.atWar ? `Em guerra · tropas custam ×${fmtDec(war.warFactor)}` : 'Em paz'),
-      kv('coins', 'Gasto militar', `${fmtMoney(war.militaryCost)} <span class="muted">(${fmtPct(c.income > 0 ? war.militaryCost / c.income : 0, 0)} da receita)</span>`),
+      kv('swords', 'Situação', war.atWar ? `Em guerra${sub(`tropas custam ×${fmtDec(war.warFactor)}`)}` : 'Em paz'),
+      kv('coins', 'Gasto militar', `${fmtMoney(war.militaryCost)}${sub(`${fmtPct(c.income > 0 ? war.militaryCost / c.income : 0, 0)} da receita`)}`),
       kv('people', 'Mobilização', fmtPct(war.mobilization, 1)),
-      kv('scroll', 'Crédito de guerra', war.atWar ? (war.credit > 0 ? fmtMoney(war.credit) : '<span class="neg">esgotado</span>') : '—'),
-      kv('fire', 'Inflação', `${fmtPct(c.inflation)} <span class="muted">(${inflationLabel})</span>`),
+      kv('scroll', 'Crédito de guerra', war.atWar ? (war.credit > 0 ? fmtMoney(war.credit) : signed('esgotado', false)) : '—'),
+      kv('fire', 'Inflação', `${fmtPct(c.inflation)}${sub(inflationLabel)}`),
       kv('skull', 'Infraestrutura destruída', fmtPct(war.devastation, 0)),
-      barRow(war.devastation, 'var(--red-2)'),
-      kv('building', 'Produção perdida', `${fmtPct(war.lostShare, 0)} <span class="muted">(${fmtPct(war.occupiedShare, 0)} em estados ocupados)</span>`),
+      barRow(war.devastation, COLORS.red),
+      kv('building', 'Produção perdida', `${fmtPct(war.lostShare, 0)}${sub(`${fmtPct(war.occupiedShare, 0)} em estados ocupados`)}`),
       kv('pin', 'Estados arrasados', String(war.ruined)),
     ]);
-    return sec('Finanças', 'coins', rows) + sec('Economia de guerra', 'swords', warHint + warRows) + sec('Modificadores', 'info', modsHtml) + (chart ? sec('PIB ao longo do tempo', 'chart', chart) : '');
+    return (
+      section('Finanças', 'coins', financas) +
+      section('Economia de guerra', 'swords', warHint + warRows) +
+      section('Modificadores', 'info', modsHtml) +
+      (chart ? section('PIB ao longo do tempo', 'chart', chart) : '')
+    );
   }
 
   private militar(): string {
@@ -263,7 +308,7 @@ export class NationPanel extends BasePanel {
     }
     const total = Math.max(1, inf + cav + art);
     const armyCost = c.armySize * sim.economy.soldierMonthlyCost(c);
-    const rows = kvGrid([
+    const forcas = kvGrid([
       kv('sword', 'Exército', `${fmtInt(inf + cav + art)} soldados`),
       kv('helmet', 'Infantaria', fmtInt(inf)),
       kv('flag', sim.technology.cavalryName(c), fmtInt(cav)),
@@ -271,22 +316,25 @@ export class NationPanel extends BasePanel {
       kv('anchor', 'Marinha', `${Math.round(c.navy)} navios`),
       kv('plane', 'Força aérea', sim.technology.hasAirForce(c) ? `${Math.round(c.airForce)} esquadrões` : 'Não disponível'),
       kv('trophy', 'Experiência', fmtPct(exp / total, 0)),
-      kv('smile', 'Moral', fmtPct(morale / total, 0)), barRow(morale / total, 'var(--green)'),
+      kv('smile', 'Moral', fmtPct(morale / total, 0)), barRow(morale / total, COLORS.green),
       kv('chest', 'Logística', fmtPct(supply / total, 0)),
       kv('people', 'Manpower', `${fmtCompact(c.manpower)} / ${fmtCompact(c.maxManpower)}`),
-      kv('coins', 'Gasto militar', `${fmtMoney(armyCost)}/mês <span class="muted">(${fmtPct(c.income > 0 ? armyCost / c.income : 0, 0)} da receita)</span>`),
+      kv('coins', 'Gasto militar', `${fmtMoney(armyCost)}/mês${sub(`${fmtPct(c.income > 0 ? armyCost / c.income : 0, 0)} da receita`)}`),
       kv('target', 'Efetivo desejado', fmtCompact(sim.military.targetArmySize(c))),
       kv('swords', 'Batalhas', `${c.battlesWon} vitórias · ${c.battlesLost} derrotas`),
     ]);
     const generals = c.generals.length
-      ? `<table class="mini-table"><tr><th>General</th><th class="num">Atq</th><th class="num">Def</th><th class="num">Man</th><th class="num">Cer</th><th class="num">V/D</th></tr>${c.generals
-          .map((g) => `<tr${g.army >= 0 ? ` class="link" data-army="${g.army}"` : ''}><td>${esc(g.name)}${g.army >= 0 ? ' ' + icon('sword', 12) : ''}</td><td class="num">${g.attack}</td><td class="num">${g.defense}</td><td class="num">${g.maneuver}</td><td class="num">${g.siege}</td><td class="num">${g.victories}/${g.defeats}</td></tr>`)
-          .join('')}</table>`
-      : '<div class="muted">Nenhum general.</div>';
+      ? table(
+          [['General'], ['Atq', true], ['Def', true], ['Man', true], ['Cer', true], ['V/D', true]],
+          c.generals
+            .map((g) => `<tr${g.army >= 0 ? ` class="${TR_LINK}" data-army="${g.army}"` : ''}>${td(`${esc(g.name)}${g.army >= 0 ? ` ${icon('sword', 12)}` : ''}`)}${td(String(g.attack), true)}${td(String(g.defense), true)}${td(String(g.maneuver), true)}${td(String(g.siege), true)}${td(`${g.victories}/${g.defeats}`, true)}</tr>`)
+            .join(''),
+        )
+      : mutedBlock('Nenhum general.');
     const armyRows = armies.length
-      ? `<table class="mini-table">${armies.map((a) => `<tr class="link" data-army="${a.id}"><td>${esc(a.name)}<br><span class="muted">${esc(armyStatus(sim, a))}</span></td><td class="num">${fmtCompact(soldiersOf(a))}</td></tr>`).join('')}</table>`
-      : '<div class="muted">Sem exércitos mobilizados.</div>';
-    return sec('Forças armadas', 'sword', rows) + sec('Exércitos', 'flag', armyRows) + sec('Generais', 'helmet', generals) + sec('Guerras', 'swords', this.warLists());
+      ? table([], armies.map((a) => `<tr class="${TR_LINK}" data-army="${a.id}">${td(`${esc(a.name)}${sub(esc(armyStatus(sim, a)))}`)}${td(fmtCompact(soldiersOf(a)), true)}</tr>`).join(''))
+      : mutedBlock('Sem exércitos mobilizados.');
+    return section('Forças armadas', 'sword', forcas) + section('Exércitos', 'flag', armyRows) + section('Generais', 'helmet', generals) + section('Guerras', 'swords', this.warLists());
   }
 
   private warLists(): string {
@@ -294,8 +342,8 @@ export class NationPanel extends BasePanel {
     const c = sim.country(this.id);
     const current = sim.wars.warsOf(c.id);
     const cur = current.length
-      ? current.map((w) => `<div class="row">${icon('swords', 16)}<span class="grow">${warLink(w)}</span><span class="num">${w.warscore >= 0 === (sim.wars.sideOf(w, c.id) === 0) ? '+' : '−'}${Math.abs(Math.round(w.warscore))}</span></div>`).join('')
-      : '<div class="muted">Nenhuma guerra em andamento.</div>';
+      ? current.map((w) => row(`${icon('swords', 16)}${grow(warLink(w))}${num(`${w.warscore >= 0 === (sim.wars.sideOf(w, c.id) === 0) ? '+' : '−'}${Math.abs(Math.round(w.warscore))}`)}`)).join('')
+      : mutedBlock('Nenhuma guerra em andamento.');
     const past = c.pastWars
       .slice(-12)
       .reverse()
@@ -304,11 +352,11 @@ export class NationPanel extends BasePanel {
       .map((w) => {
         const side = w.attackers.includes(c.id) ? 0 : w.defenders.includes(c.id) ? 1 : -1;
         const res = w.result?.winner;
-        const label = res === 'white' ? '<span class="chip">Paz branca</span>' : side < 0 ? '<span class="chip">—</span>' : (res === 'attackers') === (side === 0) ? '<span class="chip green">Vitória</span>' : '<span class="chip red">Derrota</span>';
-        return `<div class="row"><span class="grow">${warLink(w)}</span><span class="muted">${sim.year(w.start)}–${sim.year(w.end)}</span>${label}</div>`;
+        const label = res === 'white' ? chip('Paz branca') : side < 0 ? chip('—') : (res === 'attackers') === (side === 0) ? chip('Vitória', 'green') : chip('Derrota', 'red');
+        return row(`${stack(`${warLink(w)}${sub(`${sim.year(w.start)}–${sim.year(w.end)}`)}`)}${label}`, { top: true });
       })
       .join('');
-    return `<div class="rows">${cur}</div><div class="muted" style="margin-top:6px">Guerras anteriores:</div><div class="rows">${past || '<div class="muted">Nenhuma.</div>'}</div>`;
+    return `${rows(cur)}${mutedBlock('Guerras anteriores:', 'mt-1.5')}${rows(past || mutedBlock('Nenhuma.'))}`;
   }
 
   // Ciencia, pesquisas, adaptacao produtiva, importacoes, contratos, monopolios e tecnologias por era.
@@ -320,15 +368,15 @@ export class NationPanel extends BasePanel {
     const s = c.science;
     const year = sim.year();
     const nation = c.kind === 'nation' && c.alive;
-    const rank = nation ? ` <span class="muted">#${sim.stats.rankOf(c.id, 'tech')}</span>` : '';
+    const rank = nation ? ` ${muted(`#${sim.stats.rankOf(c.id, 'tech')}`)}` : '';
     const ciencia = kvGrid([
       kv('globe', 'Era atual', esc(sim.eras.current().name)),
       kv('gear', 'Nível tecnológico', `${fmtDec(c.tech)}${rank}`),
-      kv('chart', 'Capacidade de pesquisa', `${fmtDec(s.capacity)} <span class="muted">(1,5 = líderes)</span>`),
-      kv('book', 'Educação', fmtPct(s.education, 0)), barRow(s.education, 'var(--blue)'),
+      kv('chart', 'Capacidade de pesquisa', `${fmtDec(s.capacity)}${sub('1,5 = líderes')}`),
+      kv('book', 'Educação', fmtPct(s.education, 0)), barRow(s.education, COLORS.blue),
       kv('temple', 'Universidades', fmtInt(s.universities)),
       kv('people', 'Cientistas', fmtCompact(s.scientists)),
-      kv('building', 'Industrialização', fmtPct(s.industrialization, 0)), barRow(s.industrialization, 'var(--gold)'),
+      kv('building', 'Industrialização', fmtPct(s.industrialization, 0)), barRow(s.industrialization, COLORS.gold),
       kv('target', 'Inteligência', fmtPct(s.intelligence, 0)),
       kv('shield', 'Contraespionagem', fmtPct(s.security, 0)),
       kv('coins', 'Pesquisa e fábricas', `${fmtMoney(s.spending)}/mês`),
@@ -339,36 +387,47 @@ export class NationPanel extends BasePanel {
       .map(([id, h]) => ({ t: db.get(id), h }))
       .filter((x): x is { t: NonNullable<typeof x.t>; h: typeof x.h } => !!x.t);
     const progressRow = (id: string, name: string, label: string, progress: number) =>
-      `<div class="row link" data-tech="${esc(id)}"><span class="grow">${esc(name)}</span><span class="muted">${esc(label)}</span><span class="num">${fmtPct(progress, 0)}</span></div><div style="margin:-2px 0 4px">${bar(progress, 'var(--gold)')}</div>`;
+      row(`${stack(`${esc(name)}${label ? sub(esc(label)) : ''}`)}${num(fmtPct(progress, 0))}`, { link: true, top: true, attrs: `data-tech="${esc(id)}"` }) +
+      `<div class="-mt-0.5 mb-1">${bar(progress, COLORS.gold)}</div>`;
     const research = holdings.filter((x) => x.h.stage === 'pesquisa').sort((a, b) => b.h.progress - a.h.progress);
     const researchHtml = research.length
-      ? research.map((x) => {
-        const rec = tech.record(x.t.id);
-        const label = x.t.anoDescoberta > year ? `preparatória · possível em ${x.t.anoDescoberta}` : !rec.discovered ? 'corrida pela descoberta' : 'desenvolvimento próprio';
-        return progressRow(x.t.id, x.t.nome, label, x.h.progress);
-      }).join('')
-      : '<div class="muted">Nenhum projeto em andamento.</div>';
+      ? research
+          .map((x) => {
+            const rec = tech.record(x.t.id);
+            const label = x.t.anoDescoberta > year ? `preparatória · possível em ${x.t.anoDescoberta}` : !rec.discovered ? 'corrida pela descoberta' : 'desenvolvimento próprio';
+            return progressRow(x.t.id, x.t.nome, label, x.h.progress);
+          })
+          .join('')
+      : mutedBlock('Nenhum projeto em andamento.');
     const adapting = holdings.filter((x) => x.h.stage === 'conhecimento').sort((a, b) => b.h.progress - a.h.progress);
     const adaptHtml = adapting.length
       ? adapting.map((x) => progressRow(x.t.id, x.t.nome, x.h.source ? ACQUISITION_LABELS[x.h.source] : '', x.h.progress)).join('')
-      : '<div class="muted">Nenhuma tecnologia aguardando produção.</div>';
+      : mutedBlock('Nenhuma tecnologia aguardando produção.');
     const imports = holdings.filter((x) => x.h.stage === 'importacao');
     const importsHtml = imports.length
-      ? `<div class="rows">${imports.map((x) => `<div class="row">${techLink(sim, x.t.id)}<span class="grow"></span><span class="muted">de ${cLink(sim, x.h.supplier)}</span></div>`).join('')}</div>`
-      : '<div class="muted">Nenhuma importação.</div>';
+      ? rows(imports.map((x) => row(stack(`${techLink(sim, x.t.id)}${sub(`importada de ${cLink(sim, x.h.supplier)}`)}`), { top: true })).join(''))
+      : mutedBlock('Nenhuma importação.');
     const contractNames = { importacao: 'Importação', licenciamento: 'Licença', investimento: 'Investimento' } as const;
     const contracts = tech.trade.contractsOf(c.id);
     const contractsHtml = contracts.length
-      ? `<div class="rows">${contracts.map((k) => `<div class="row"><span class="grow">${contractNames[k.type]}: ${techLink(sim, k.tech)} · ${cLink(sim, k.buyer === c.id ? k.seller : k.buyer)}</span><span class="num ${k.buyer === c.id ? 'neg' : 'pos'}">${k.buyer === c.id ? '−' : '+'}${fmtMoney(k.monthly)}/mês</span></div>`).join('')}</div>`
-      : '<div class="muted">Nenhum contrato em vigor.</div>';
+      ? rows(
+          contracts
+            .map((k) => {
+              const buying = k.buyer === c.id;
+              const detail = `${contractNames[k.type]} · ${buying ? 'de' : 'para'} ${cLink(sim, buying ? k.seller : k.buyer)}`;
+              return row(`${stack(`${techLink(sim, k.tech)}${sub(detail)}`)}${num(`${buying ? '−' : '+'}${fmtMoney(k.monthly)}/mês`, buying ? 'text-neg' : 'text-pos')}`, { top: true });
+            })
+            .join(''),
+        )
+      : mutedBlock('Nenhum contrato em vigor.');
     const produced = holdings.filter((x) => x.h.stage === 'producao');
     const monopolies = produced.filter((x) => tech.record(x.t.id).holders <= 1);
-    const policies = (['aberta', 'licencia', 'exporta', 'segredo'] as const).map((p) => `${esc(POLICY_LABELS[p])}: ${produced.filter((x) => x.h.policy === p).length}`).join(' · ');
+    const policies = (['aberta', 'licencia', 'exporta', 'segredo'] as const).map((p) => `${esc(POLICY_LABELS[p])}: ${produced.filter((x) => x.h.policy === p).length}`);
     const secrets = produced.filter((x) => x.h.policy === 'segredo');
     const propriedade = kvGrid([
       kv('building', 'Tecnologias produzidas', fmtInt(produced.length)),
-      `<span></span><span class="list">${policies}</span>`,
-      kv('crown', 'Monopólios', monopolies.length ? monopolies.map((x) => techLink(sim, x.t.id)).join(', ') : 'nenhum'),
+      kvItems(policies),
+      kvList('crown', 'Monopólios', monopolies.map((x) => techLink(sim, x.t.id))),
       kv('shield', 'Mantidas em segredo', secrets.length ? `${secrets.length}` : 'nenhuma'),
     ]);
     const eras = HISTORICAL_ERAS.map((e) => {
@@ -376,23 +435,29 @@ export class NationPanel extends BasePanel {
       const available = all.filter((t) => t.anoDescoberta <= year).length;
       if (!available) return '';
       const known = all.filter((t) => tech.knows(c, t.id)).length;
-      return `<div class="row"><span class="grow">${esc(e.name)} <span class="muted">(${eraSpan(e)})</span></span><span class="num">${known}/${available}</span></div><div style="margin:-2px 0 4px">${bar(known / available, 'var(--green)')}</div>`;
+      return row(`${grow(`${esc(e.name)} ${muted(`(${eraSpan(e)})`)}`)}${num(`${known}/${available}`)}`) + `<div class="-mt-0.5 mb-1">${bar(known / available, COLORS.green)}</div>`;
     }).join('');
     const recent = holdings
       .filter((x) => (x.h.stage === 'conhecimento' || x.h.stage === 'producao') && x.h.source && x.h.source !== 'pre_existente' && x.h.source !== 'heranca')
       .sort((a, b) => b.h.acquired - a.h.acquired)
       .slice(0, 12)
-      .map((x) => `<div class="row link" data-tech="${esc(x.t.id)}">${techDot(tech.status(c, x.t.id))}<span class="grow">${esc(x.t.nome)}</span><span class="muted">${sim.year(x.h.acquired)} · ${esc(ACQUISITION_LABELS[x.h.source ?? 'pesquisa'])}</span></div>`)
+      .map((x) =>
+        row(`<span class="pt-1">${techDot(tech.status(c, x.t.id))}</span>${stack(`${esc(x.t.nome)}${sub(`${sim.year(x.h.acquired)} · ${esc(ACQUISITION_LABELS[x.h.source ?? 'pesquisa'])}`)}`)}`, {
+          link: true,
+          top: true,
+          attrs: `data-tech="${esc(x.t.id)}"`,
+        }),
+      )
       .join('');
     return (
-      sec('Ciência e pesquisa', 'gear', ciencia) +
-      sec(`Pesquisas em andamento (${research.length})`, 'book', researchHtml) +
-      sec(`Adaptação à produção (${adapting.length})`, 'building', adaptHtml) +
-      sec('Propriedade tecnológica', 'crown', propriedade) +
-      sec(`Importações (${imports.length})`, 'coins', importsHtml) +
-      sec(`Contratos tecnológicos (${contracts.length})`, 'scroll', contractsHtml) +
-      sec('Tecnologias dominadas por era', 'chart', eras) +
-      sec('Aquisições recentes', 'scroll', recent ? `<div class="rows">${recent}</div>` : '<div class="muted">Nenhuma aquisição desde o início.</div>')
+      section('Ciência e pesquisa', 'gear', ciencia) +
+      section(`Pesquisas em andamento (${research.length})`, 'book', researchHtml) +
+      section(`Adaptação à produção (${adapting.length})`, 'building', adaptHtml) +
+      section('Propriedade tecnológica', 'crown', propriedade) +
+      section(`Importações (${imports.length})`, 'coins', importsHtml) +
+      section(`Contratos tecnológicos (${contracts.length})`, 'scroll', contractsHtml) +
+      section('Tecnologias dominadas por era', 'chart', eras) +
+      section('Aquisições recentes', 'scroll', recent ? rows(recent) : mutedBlock('Nenhuma aquisição desde o início.'))
     );
   }
 
@@ -406,14 +471,14 @@ export class NationPanel extends BasePanel {
     const treaties = dip.treatiesOf(c.id).filter((t) => t.type !== 'peace');
     const guaranteesGiven = sim.state.treaties.filter((t) => t.active && t.type === 'guarantee' && t.members[0] === c.id).map((t) => t.target);
     const guaranteed = dip.guarantorsOf(c.id);
-    const list = (ids: number[]) => (ids.length ? ids.map((i) => cLink(sim, i)).join(', ') : '<span class="muted">Nenhum</span>');
-    const summary = kvGrid([
-      kv('shield', 'Aliados', list(allies)),
-      kv('swords', 'Inimigos (em guerra)', list(enemies)),
-      kv('crown', 'Suserano', c.overlord >= 0 ? cLink(sim, c.overlord) : '<span class="muted">Independente</span>'),
-      kv('crown', 'Vassalos', list(vassals)),
-      kv('shield', 'Garante', list(guaranteesGiven)),
-      kv('shield', 'Garantido por', list(guaranteed)),
+    const links = (ids: number[]) => ids.map((i) => cLink(sim, i));
+    const resumo = kvGrid([
+      kvList('shield', 'Aliados', links(allies)),
+      kvList('swords', 'Inimigos (em guerra)', links(enemies)),
+      kv('crown', 'Suserano', c.overlord >= 0 ? cLink(sim, c.overlord) : muted('independente')),
+      kvList('crown', 'Vassalos', links(vassals)),
+      kvList('shield', 'Garante a independência de', links(guaranteesGiven)),
+      kvList('shield', 'Independência garantida por', links(guaranteed)),
     ]);
     const pool = new Set<number>([...sim.countries.neighbors(c.id), ...allies, ...enemies, ...vassals]);
     for (const t of treaties) {
@@ -427,24 +492,29 @@ export class NationPanel extends BasePanel {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 40);
     const relRows = rels.length
-      ? rels.map(([o, r]) => `<div class="row"><span class="grow">${cLink(sim, o)}</span><span style="width:84px">${centerBar(r / 100)}</span><span class="num" style="width:34px;text-align:right">${Math.round(r)}</span><span class="muted" style="width:92px;text-align:right">${relationLabel(r)}</span></div>`).join('')
-      : '<div class="muted">Sem relações conhecidas.</div>';
+      ? rels
+          .map(([o, r]) => row(`${grow(cLink(sim, o))}<span class="w-[84px] shrink-0">${centerBar(r / 100)}</span>${num(String(Math.round(r)), 'w-[34px] text-right')}<span class="${MUTED} w-[92px] shrink-0 text-right">${relationLabel(r)}</span>`))
+          .join('')
+      : mutedBlock('Sem relações conhecidas.');
     const treatyRows = treaties.length
-      ? `<table class="mini-table"><tr><th>Tratado</th><th>Com</th><th class="num">Até</th></tr>${treaties
-          .map((t) => {
-            const others = [...t.members.filter((m) => m !== c.id), ...(t.target >= 0 && t.target !== c.id ? [t.target] : [])];
-            return `<tr><td>${esc(TREATY_NAMES[t.type])}</td><td>${others.slice(0, 3).map((o) => cLink(sim, o)).join(', ')}</td><td class="num">${t.end >= 0 ? sim.year(t.end) : '—'}</td></tr>`;
-          })
-          .join('')}</table>`
-      : '<div class="muted">Nenhum tratado ativo.</div>';
-    return sec('Resumo', 'scroll', summary) + sec('Relações', 'scales', `<div class="rows">${relRows}</div>`) + sec('Tratados', 'scroll', treatyRows) + sec('Guerras', 'swords', this.warLists());
+      ? table(
+          [['Tratado'], ['Com'], ['Até', true]],
+          treaties
+            .map((t) => {
+              const others = [...new Set([...t.members.filter((m) => m !== c.id), ...(t.target >= 0 && t.target !== c.id ? [t.target] : [])])];
+              return `<tr>${td(esc(TREATY_NAMES[t.type]))}${td(others.slice(0, 3).map((o) => cLink(sim, o)).join(', '))}${td(t.end >= 0 ? String(sim.year(t.end)) : '—', true)}</tr>`;
+            })
+            .join(''),
+        )
+      : mutedBlock('Nenhum tratado ativo.');
+    return section('Resumo', 'scroll', resumo) + section('Relações', 'scales', rows(relRows)) + section('Tratados', 'scroll', treatyRows) + section('Guerras', 'swords', this.warLists());
   }
 
   private territorio(): string {
     const sim = this.sim;
     const c = sim.country(this.id);
     const owned = [...(sim.index.ownedBy[c.id] ?? [])];
-    const summary = kvGrid([
+    const resumo = kvGrid([
       kv('pin', 'Estados', String(owned.length)),
       kv('flag', 'Conquistados', String(c.provincesConquered)),
       kv('skull', 'Perdidos', String(c.provincesLost)),
@@ -457,36 +527,45 @@ export class NationPanel extends BasePanel {
       .map((ch) => {
         const gained = ch.to === c.id;
         const other = gained ? ch.from : ch.to;
-        return `<div class="row"><span class="muted" style="width:44px">${sim.year(ch.day)}</span><span class="chip ${gained ? 'green' : 'red'}">${gained ? 'Ganhou' : 'Perdeu'}</span><span class="grow">${pLink(sim, ch.province)}</span><span class="muted">${other >= 0 ? `${gained ? 'de' : 'para'} ${esc(sim.country(other).name)}` : ''}</span></div>`;
+        const detail = `${sim.year(ch.day)}${other >= 0 ? ` · ${gained ? 'de' : 'para'} ${esc(sim.country(other).name)}` : ''}`;
+        return row(`${chip(gained ? 'Ganhou' : 'Perdeu', gained ? 'green' : 'red')}${stack(`${pLink(sim, ch.province)}${sub(detail)}`)}`, { top: true });
       })
       .join('');
     const cities = sim.cities.citiesOf(c.id, 10);
     const cityRows = cities.length
-      ? `<table class="mini-table"><tr><th>Cidade</th><th class="num">População</th><th class="num">Import.</th><th class="num">Estrat.</th></tr>${cities
-          .map((ci) => `<tr class="link" data-province="${ci.province}"><td>${ci.isCapital ? icon('castle', 12) + ' ' : ''}${esc(ci.name)}</td><td class="num">${fmtCompact(ci.population)}</td><td class="num">${Math.round(ci.importance)}</td><td class="num">${Math.round(ci.strategic)}</td></tr>`)
-          .join('')}</table>`
-      : '<div class="muted">Sem cidades.</div>';
+      ? table(
+          [['Cidade'], ['População', true], ['Import.', true], ['Estrat.', true]],
+          cities
+            .map((ci) => `<tr class="${TR_LINK}" data-province="${ci.province}">${td(`${ci.isCapital ? `${icon('castle', 12)} ` : ''}${esc(ci.name)}`)}${td(fmtCompact(ci.population), true)}${td(String(Math.round(ci.importance)), true)}${td(String(Math.round(ci.strategic)), true)}</tr>`)
+            .join(''),
+        )
+      : mutedBlock('Sem cidades.');
     owned.sort((a, b) => sim.state.provinces[b].population - sim.state.provinces[a].population);
     const provRows = owned.length
-      ? `<table class="mini-table"><tr><th>Estado</th><th class="num">Pop.</th><th class="num">Desenv.</th><th class="num">Agit.</th><th>Terreno</th></tr>${owned
-          .slice(0, 80)
-          .map((p) => {
-            const ps = sim.state.provinces[p];
-            return `<tr class="link" data-province="${p}"><td>${esc(sim.map.provinces[p].name)}${ps.controller !== c.id ? ' ' + icon('swords', 12) : ''}</td><td class="num">${fmtCompact(ps.population)}</td><td class="num">${ps.development.toFixed(1)}</td><td class="num">${Math.round(ps.unrest)}%</td><td>${esc(terrainInfo(sim.map.provinces[p].terrain).name)}</td></tr>`;
-          })
-          .join('')}</table>${owned.length > 80 ? `<div class="muted">… e mais ${owned.length - 80} estados.</div>` : ''}`
-      : '<div class="muted">Nenhum estado.</div>';
+      ? table(
+          [['Estado'], ['Pop.', true], ['Desenv.', true], ['Agit.', true], ['Terreno']],
+          owned
+            .slice(0, 80)
+            .map((p) => {
+              const ps = sim.state.provinces[p];
+              return `<tr class="${TR_LINK}" data-province="${p}">${td(`${esc(sim.map.provinces[p].name)}${ps.controller !== c.id ? ` ${icon('swords', 12)}` : ''}`)}${td(fmtCompact(ps.population), true)}${td(ps.development.toFixed(1), true)}${td(`${Math.round(ps.unrest)}%`, true)}${td(esc(terrainInfo(sim.map.provinces[p].terrain).name))}</tr>`;
+            })
+            .join(''),
+        ) + (owned.length > 80 ? mutedBlock(`… e mais ${owned.length - 80} estados.`) : '')
+      : mutedBlock('Nenhum estado.');
     const knownTechs = Object.values(c.techs).filter((h) => h.stage === 'conhecimento' || h.stage === 'producao').length;
-    const techHtml = `<div class="muted">${knownTechs} tecnologias dominadas · nível tecnológico ${fmtDec(c.tech)}. Detalhes na aba Tecnologia.</div>`;
+    const techHtml = mutedBlock(`${knownTechs} tecnologias dominadas · nível tecnológico ${fmtDec(c.tech)}. Detalhes na aba Tecnologia.`);
     const traits = [...c.traits, ...c.modifiers.map((m) => m.name)];
-    const traitsHtml = traits.length ? traits.map((t) => `<span class="chip gold">${esc(t)}</span>`).join('') : `<span class="chip">${esc(PERSONALITIES[c.personality].name)}</span><span class="chip">${esc(CULTURES[c.culture].name)}</span><span class="chip">${esc(RELIGIONS[c.religion].name)}</span>`;
+    const traitsHtml = traits.length
+      ? traits.map((t) => chip(esc(t), 'gold')).join('')
+      : chip(esc(PERSONALITIES[c.personality].name)) + chip(esc(CULTURES[c.culture].name)) + chip(esc(RELIGIONS[c.religion].name));
     return (
-      sec('Território', 'pin', summary) +
-      sec('Mudanças territoriais recentes', 'flag', changes || '<div class="muted">Nenhuma mudança recente.</div>') +
-      sec('Cidades importantes', 'house', cityRows) +
-      sec('Estados', 'pin', provRows) +
-      sec('Tecnologias', 'gear', techHtml) +
-      sec('Características', 'info', traitsHtml)
+      section('Território', 'pin', resumo) +
+      section('Mudanças territoriais recentes', 'flag', changes ? rows(changes) : mutedBlock('Nenhuma mudança recente.')) +
+      section('Cidades importantes', 'house', cityRows) +
+      section('Estados', 'pin', provRows) +
+      section('Tecnologias', 'gear', techHtml) +
+      section('Características', 'info', traitsHtml)
     );
   }
 
@@ -494,39 +573,60 @@ export class NationPanel extends BasePanel {
     const sim = this.sim;
     const c = sim.country(this.id);
     const f = this.form;
-    const sel = (key: string, options: string) => `<select class="px-select" data-f="${key}" data-change="remember">${options}</select>`;
+    const sel = (key: string, options: string) => `<select class="${FIELD_GROW}" data-f="${key}" data-change="remember">${options}</select>`;
     const targetOpts = countryOptions(sim, c.id, Number(f.target || -1));
     const dipOpts = countryOptions(sim, c.id, Number(f.dip || -1));
+    const small = (label: string, attrs: string, iconName?: string) => button(esc(label), { size: 'sm', icon: iconName, attrs });
+    const act = (action: string, label: string, iconName?: string) => small(label, `data-action="${action}"`, iconName);
     const wars = sim.wars.warsOf(c.id);
     const warRows = wars.length
-      ? wars.map((w) => `<div class="action"><span class="grow">${warLink(w)}</span><button class="px-btn small" data-action="peace-white" data-war-id="${w.id}">Paz branca</button><button class="px-btn small" data-action="peace-win" data-war-id="${w.id}">Vencer</button><button class="px-btn small" data-action="peace-lose" data-war-id="${w.id}">Render-se</button></div>`).join('')
-      : '<div class="muted">Nenhuma guerra ativa.</div>';
+      ? wars
+          .map((w) => {
+            const warAttr = (action: string) => `data-action="${action}" data-war-id="${w.id}"`;
+            return `<div class="mb-1.5"><div>${warLink(w)}</div>${actions(small('Paz branca', warAttr('peace-white')) + small('Vencer', warAttr('peace-win')) + small('Render-se', warAttr('peace-lose')), 'mt-[3px]')}</div>`;
+          })
+          .join('')
+      : mutedBlock('Nenhuma guerra ativa.');
     const govOpts = GOVERNMENT_IDS.map((g) => `<option value="${g}"${g === (f.gov || c.government) ? ' selected' : ''}>${esc(GOVERNMENTS[g].name)}</option>`).join('');
     const persOpts = PERSONALITY_IDS.map((p) => `<option value="${p}"${p === (f.pers || c.personality) ? ' selected' : ''}>${esc(PERSONALITIES[p].name)}</option>`).join('');
     const eventOpts = EVENTS.map((e) => `<option value="${e.id}"${e.id === f.event ? ' selected' : ''}>${esc(e.name)}</option>`).join('');
     const goalOpts = (['conquest', 'annex', 'subjugate'] as const).map((g) => `<option value="${g}"${g === f.goal ? ' selected' : ''}>${esc(GOAL_NAMES[g])}</option>`).join('');
-    const btn = (action: string, label: string, iconName: string) => `<button class="px-btn small" data-action="${action}">${icon(iconName, 14)} ${esc(label)}</button>`;
     return (
-      `<div class="hint-box">Você é o observador e controlador deste mundo. As ações abaixo interferem diretamente na simulação.</div>` +
-      (this.lastResult ? `<div class="banner gold">${icon('info', 16)} ${esc(this.lastResult)}</div>` : '') +
-      sec('Controle', 'gear', `<div class="action"><span class="grow">Diplomacia autônoma: <b>${c.ai ? 'ativada' : 'desativada'}</b></span><button class="px-btn small" data-action="toggle-ai">${c.ai ? 'Assumir controle' : 'Devolver à IA'}</button></div>`) +
-      sec('Guerra', 'swords', `
-        <div class="action">${sel('target', targetOpts)}</div>
-        <div class="action">${sel('goal', goalOpts)}<button class="px-btn small primary" data-action="declare">${icon('swords', 14)} Declarar guerra</button></div>
-        <div class="rows" style="margin-top:6px">${warRows}</div>`) +
-      sec('Diplomacia', 'scroll', `
-        <div class="action">${sel('dip', dipOpts)}</div>
-        <div class="action">${btn('alliance', 'Formar aliança', 'shield')}${btn('break-alliance', 'Romper aliança', 'skull')}${btn('nap', 'Não agressão', 'dove')}${btn('trade', 'Acordo comercial', 'coins')}</div>
-        <div class="action">${btn('access', 'Acesso militar', 'flag')}${btn('guarantee', 'Garantir independência', 'shield')}${btn('sanction', 'Impor sanções', 'skull')}${btn('support', 'Apoiar (ouro)', 'chest')}</div>
-        <div class="action">${btn('threaten', 'Ameaçar', 'sword')}${btn('recognize', 'Reconhecer independência', 'scroll')}${btn('coalition', 'Coalizão contra', 'swords')}</div>`) +
-      sec('Política interna', 'crown', `
-        <div class="action">${sel('gov', govOpts)}<button class="px-btn small" data-action="government">Mudar governo</button></div>
-        <div class="action">${sel('pers', persOpts)}<button class="px-btn small" data-action="personality">Definir personalidade</button></div>
-        <div class="action">${btn('stab-up', 'Estabilidade +15', 'scales')}${btn('stab-down', 'Estabilidade −15', 'scales')}${btn('corruption', 'Combater corrupção', 'coins')}${btn('prestige', 'Prestígio +15', 'crown')}</div>
-        <div class="action">${btn('incite', 'Incitar rebelião', 'fire')}${btn('civil-war', 'Provocar guerra civil', 'fire')}</div>`) +
-      sec('Recursos', 'chest', `<div class="action">${btn('grant-army', 'Conceder exército', 'sword')}${btn('grant-gold', 'Conceder ouro', 'coins')}${btn('tech', 'Conceder tecnologia', 'gear')}</div>`) +
-      sec('Eventos', 'info', `<div class="action">${sel('event', eventOpts)}<button class="px-btn small" data-action="event">Disparar evento</button></div>`) +
-      sec('Identidade', 'flag', `<div class="action"><input class="px-input" data-f="name" data-change="remember" placeholder="Novo nome" value="${esc(f.name)}"><button class="px-btn small" data-action="rename">Renomear</button></div>`)
+      hint('Você é o observador e controlador deste mundo. As ações abaixo interferem diretamente na simulação.') +
+      (this.lastResult ? banner(`${icon('info', 16)} ${esc(this.lastResult)}`, 'gold') : '') +
+      section('Controle', 'gear', actions(`<span class="min-w-0 flex-1">Diplomacia autônoma: <b>${c.ai ? 'ativada' : 'desativada'}</b></span>${act('toggle-ai', c.ai ? 'Assumir controle' : 'Devolver à IA')}`)) +
+      section(
+        'Guerra',
+        'swords',
+        formRows(
+          actions(sel('target', targetOpts)) +
+            actions(sel('goal', goalOpts) + button('Declarar guerra', { tone: 'primary', size: 'sm', icon: 'swords', attrs: 'data-action="declare"' })) +
+            `<div class="${ROWS}">${warRows}</div>`,
+        ),
+      ) +
+      section(
+        'Diplomacia',
+        'scroll',
+        formRows(
+          actions(sel('dip', dipOpts)) +
+            actions(act('alliance', 'Formar aliança', 'shield') + act('break-alliance', 'Romper aliança', 'skull') + act('nap', 'Não agressão', 'dove') + act('trade', 'Acordo comercial', 'coins')) +
+            actions(act('access', 'Acesso militar', 'flag') + act('guarantee', 'Garantir independência', 'shield') + act('sanction', 'Impor sanções', 'skull') + act('support', 'Apoiar (ouro)', 'chest')) +
+            actions(act('threaten', 'Ameaçar', 'sword') + act('recognize', 'Reconhecer independência', 'scroll') + act('coalition', 'Coalizão contra', 'swords')),
+        ),
+      ) +
+      section(
+        'Política interna',
+        'crown',
+        formRows(
+          actions(sel('gov', govOpts) + act('government', 'Mudar governo')) +
+            actions(sel('pers', persOpts) + act('personality', 'Definir personalidade')) +
+            actions(act('stab-up', 'Estabilidade +15', 'scales') + act('stab-down', 'Estabilidade −15', 'scales') + act('corruption', 'Combater corrupção', 'coins') + act('prestige', 'Prestígio +15', 'crown')) +
+            actions(act('incite', 'Incitar rebelião', 'fire') + act('civil-war', 'Provocar guerra civil', 'fire')),
+        ),
+      ) +
+      section('Recursos', 'chest', actions(act('grant-army', 'Conceder exército', 'sword') + act('grant-gold', 'Conceder ouro', 'coins') + act('tech', 'Conceder tecnologia', 'gear'))) +
+      section('Eventos', 'info', actions(sel('event', eventOpts) + act('event', 'Disparar evento'))) +
+      section('Identidade', 'flag', actions(`<input class="${FIELD_GROW}" data-f="name" data-change="remember" placeholder="Novo nome" value="${esc(f.name)}">${act('rename', 'Renomear')}`))
     );
   }
 

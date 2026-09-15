@@ -1,9 +1,9 @@
 // Salvar/carregar dentro do jogo: novo save, sobrescrever, carregar, exportar, apagar e importar.
 import type { SaveMeta } from '../../persistence/SaveManager';
+import { actions, banner, btnClass, button, empty, FIELD_GROW, modalTitle, mutedBlock, section } from '../components';
 import { esc, icon } from '../dom';
 import type { GameUI } from '../game/GameUI';
 import { renderSaveRows } from '../screens/LoadScreen';
-import { sec } from './common';
 import { BasePanel } from './Panel';
 
 export class SaveModal extends BasePanel {
@@ -30,21 +30,23 @@ export class SaveModal extends BasePanel {
   }
 
   protected renderHead(): string {
-    const title = this.mode === 'save' ? 'Salvar Jogo' : 'Carregar Jogo';
-    return `${icon(this.mode === 'save' ? 'save' : 'folder', 32)}<h2>${title}</h2><button class="px-btn square" data-close title="Fechar">${icon('close', 16)}</button>`;
+    return modalTitle(this.mode === 'save' ? 'save' : 'folder', this.mode === 'save' ? 'Salvar Jogo' : 'Carregar Jogo');
   }
 
   protected renderBody(): string {
     const sim = this.sim;
     const defaultName = `${this.ui.screen.map.name} — ${sim.year()}`;
-    const form = this.mode === 'save'
-      ? sec('Novo save', 'save', `<div class="action"><input class="px-input" data-f="name" value="${esc(defaultName)}"><button class="px-btn primary" data-action="save-new">${icon('save', 16)} Salvar</button></div>`)
-      : sec('Importar', 'folder', `<label class="px-btn">${icon('folder', 16)} Importar arquivo .avsave<input type="file" accept=".avsave" hidden data-change="import"></label>`);
-    const list = this.saves === null ? '<div class="empty">Carregando...</div>' : renderSaveRows(this.saves);
-    const overwrite = this.mode === 'save' && this.saves?.length
-      ? `<div class="muted" style="margin-top:6px">Para sobrescrever, selecione:</div><div class="action">${this.saves.slice(0, 8).map((s) => `<button class="px-btn small" data-action="overwrite" data-id="${esc(s.id)}" data-name="${esc(s.name)}">${esc(s.name)}</button>`).join('')}</div>`
-      : '';
-    return (this.message ? `<div class="banner gold">${icon('info', 16)} ${esc(this.message)}</div>` : '') + form + sec('Jogos salvos', 'book', `<div class="saves-list">${list}</div>${overwrite}`);
+    const form =
+      this.mode === 'save'
+        ? section('Novo save', 'save', actions(`<input class="${FIELD_GROW}" data-f="name" value="${esc(defaultName)}">${button('Salvar', { tone: 'primary', icon: 'save', attrs: 'data-action="save-new"' })}`))
+        : section('Importar', 'folder', `<label class="${btnClass()}">${icon('folder', 16)}Importar arquivo .avsave<input type="file" accept=".avsave" hidden data-change="import"></label>`);
+    const list = this.saves === null ? empty('Carregando...') : renderSaveRows(this.saves);
+    const overwrite =
+      this.mode === 'save' && this.saves?.length
+        ? mutedBlock('Para sobrescrever, selecione:', 'mt-1.5 mb-1') +
+          actions(this.saves.slice(0, 8).map((s) => button(esc(s.name), { size: 'sm', attrs: `data-action="overwrite" data-id="${esc(s.id)}" data-name="${esc(s.name)}"` })).join(''))
+        : '';
+    return (this.message ? banner(`${icon('info', 16)} ${esc(this.message)}`, 'gold') : '') + form + section('Jogos salvos', 'book', `<div class="flex flex-col gap-2">${list}</div>${overwrite}`);
   }
 
   protected action(name: string, t: HTMLElement): void {

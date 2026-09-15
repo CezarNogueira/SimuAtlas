@@ -5,6 +5,7 @@ import { DEFAULT_RENDER, type PickResult, type RenderSettings } from '../../rend
 import { soldiersOf } from '../../sim/engines/MilitaryEngine';
 import { PlayerActions } from '../../sim/PlayerActions';
 import type { HistoryEntry } from '../../state/types';
+import { TIP_MUTED } from '../components';
 import { el, esc, flagInline, on } from '../dom';
 import { BottomBar } from '../hud/BottomBar';
 import { MapModeBar } from '../hud/MapModeBar';
@@ -75,7 +76,8 @@ export class GameUI {
   private offs: (() => void)[] = [];
 
   constructor(readonly screen: GameScreen) {
-    this.layer = el('div', 'ui-layer');
+    // Camada da interface sobre o mapa: so os elementos filhos recebem cliques.
+    this.layer = el('div', 'group/layer pointer-events-none absolute inset-0 *:pointer-events-auto');
     screen.node.appendChild(this.layer);
     this.actions = new PlayerActions(screen.sim);
     this.prefs = loadJson<UIPrefs>(PREFS_KEY, { toastImportance: 3, autosaveYears: 10, pauseOnSelectedWar: false });
@@ -84,7 +86,7 @@ export class GameUI {
     this.bottombar = new BottomBar(this);
     this.modes = new MapModeBar(this);
     this.toasts = new Toasts(this);
-    this.tooltip = el('div', 'tooltip');
+    this.tooltip = el('div', 'pointer-events-none! absolute z-50 max-w-[280px] border-2 border-[#0e0904] bg-ink px-2 py-1.5 font-sans text-[13px] leading-[1.35] text-paper shadow-tip [&_b]:text-tip-strong');
     this.tooltip.hidden = true;
     this.layer.appendChild(this.tooltip);
     const num = (t: HTMLElement, key: string) => Number(t.dataset[key]);
@@ -135,6 +137,7 @@ export class GameUI {
   private setRight(panel: Panel | null): void {
     this.right?.destroy();
     this.right = panel;
+    this.layer.dataset.right = panel ? 'open' : '';
     if (panel) {
       this.layer.appendChild(panel.node);
       panel.update();
@@ -199,12 +202,11 @@ export class GameUI {
 
   toggleLeft(kind: LeftKind): void {
     const same = this.leftKind === kind;
-    this.left?.destroy();
-    this.left = null;
-    this.leftKind = null;
+    this.closeLeft();
     if (same) return;
     this.left = kind === 'history' ? new HistoryPanel(this) : kind === 'techs' ? new TechnologiesPanel(this) : new WarsPanel(this);
     this.leftKind = kind;
+    this.layer.dataset.left = 'open';
     this.layer.appendChild(this.left.node);
     this.left.update();
   }
@@ -213,6 +215,7 @@ export class GameUI {
     this.left?.destroy();
     this.left = null;
     this.leftKind = null;
+    this.layer.dataset.left = '';
   }
 
   openModal(kind: ModalKind): void {
@@ -291,23 +294,24 @@ export class GameUI {
 
   hover(pick: PickResult, x: number, y: number): void {
     const sim = this.sim;
+    const soft = (html: string) => `<span class="${TIP_MUTED}">${html}</span>`;
     let html = '';
     if (pick.army >= 0) {
       const a = sim.index.armyById.get(pick.army);
-      if (a) html = `<b>${esc(a.name)}</b><br>${fmtInt(soldiersOf(a))} soldados · moral ${Math.round(a.morale * 100)}%<br><span class="muted">${esc(armyStatus(sim, a))}</span>`;
+      if (a) html = `<b>${esc(a.name)}</b><br>${fmtInt(soldiersOf(a))} soldados · moral ${Math.round(a.morale * 100)}%<br>${soft(esc(armyStatus(sim, a)))}`;
     } else if (pick.battle >= 0) {
       const b = sim.index.battleById.get(pick.battle);
       if (b) {
         const att = sim.country(b.attacker.countries[0]);
         const def = sim.country(b.defender.countries[0]);
-        html = `<b>${esc(b.name)}</b><br>${esc(att.name)} x ${esc(def.name)}<br><span class="muted">${b.end < 0 ? `Dia ${b.days} de combate` : 'Encerrada'} — clique para detalhes</span>`;
+        html = `<b>${esc(b.name)}</b><br>${esc(att.name)} x ${esc(def.name)}<br>${soft(`${b.end < 0 ? `Dia ${b.days} de combate` : 'Encerrada'} — clique para detalhes`)}`;
       }
     } else if (pick.province >= 0) {
       const mp = sim.map.provinces[pick.province];
       const ps = sim.state.provinces[pick.province];
       const owner = sim.country(ps.owner);
-      html = `<b>${esc(mp.name)}</b> <span class="muted">${esc(terrainInfo(mp.terrain).name)}</span><br>${flagInline(owner, 16)} ${esc(owner.name)}`;
-      if (ps.controller !== ps.owner) html += `<br><span class="muted">Ocupada por ${esc(sim.country(ps.controller).name)}</span>`;
+      html = `<b>${esc(mp.name)}</b> ${soft(esc(terrainInfo(mp.terrain).name))}<br>${flagInline(owner, 16)} ${esc(owner.name)}`;
+      if (ps.controller !== ps.owner) html += `<br>${soft(`Ocupada por ${esc(sim.country(ps.controller).name)}`)}`;
       html += `<br>População ${fmtCompact(ps.population)} · Agitação ${Math.round(ps.unrest)}%`;
       if (ps.siege) html += `<br>Cerco: ${Math.min(100, Math.round((ps.siege.progress / ps.siege.needed) * 100))}%`;
     }
